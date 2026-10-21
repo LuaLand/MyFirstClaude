@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>15초 미션</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  /* 예능 미션 자막 — 스튜디오 핑크 배경 + 흰 미션 카드 + 외곽선 자막 */
+  :root {
+    --set: #FF3D8B;     --set-d: #D81E6C;   /* 스튜디오 배경 핑크 */
+    --ink: #17121C;     --ink-soft: #5E5468;
+    --paper: #FFFFFF;   --paper-2: #F6F1F4; --rule: #E6DCE2;
+    --yellow: #FFE14D;  --yellow-d: #E5B800;
+    --pink: #FF3D8B;    --pink-d: #C3165E;
+    --cyan: #27D3F5;    --cyan-d: #0E9DC0;
+    --green: #2FD07A;   --green-d: #179A55;
+    --win: #19C6E8;     --lose: #2A2230;
+
+    --cap: "Black Han Sans", "Pretendard Variable", system-ui, sans-serif;
+    --body: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --pop: cubic-bezier(.34, 1.56, .64, 1);
+    --ease-out: cubic-bezier(.16, 1, .3, 1);
+    --line: 3px solid var(--ink);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  ::selection { background: var(--yellow); color: var(--ink); }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 56px 16px 24px;
+    font-family: var(--body);
+    color: var(--ink);
+    background:
+      radial-gradient(rgba(255,255,255,.22) 2px, transparent 2.2px) 0 0 / 18px 18px,
+      var(--set);
+    background-attachment: fixed;
+    transition: background-color .5s var(--ease-out);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  body[data-state="win"] { --set: var(--win); }
+  body[data-state="lose"] { --set: var(--lose); }
+
+  /* 방송 화면 좌상단 로고 버그 */
+  .bug {
+    position: fixed; top: 14px; left: 16px; z-index: 0;
+    display: flex; align-items: center; gap: 8px;
+    font: 400 15px/1 var(--cap); color: #fff; letter-spacing: .02em;
+    opacity: .92; pointer-events: none;
+  }
+  .bug i { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: blink 1.4s steps(2, jump-none) infinite; }
+  .bug b { font-weight: 400; padding: 4px 8px 3px; border-radius: 6px; background: var(--ink); }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* 외곽선 자막 */
+  /* text-stroke는 글자 안쪽까지 먹어서, 그림자 링으로 바깥 외곽선만 그림 */
+  .cap {
+    --o: var(--ink); --d: 5px;
+    font-family: var(--cap); font-weight: 400;
+    letter-spacing: .01em;
+    text-shadow:
+      3px 0 0 var(--o), -3px 0 0 var(--o), 0 3px 0 var(--o), 0 -3px 0 var(--o),
+      2.1px 2.1px 0 var(--o), -2.1px 2.1px 0 var(--o), 2.1px -2.1px 0 var(--o), -2.1px -2.1px 0 var(--o),
+      2.8px 1.1px 0 var(--o), -2.8px 1.1px 0 var(--o), 2.8px -1.1px 0 var(--o), -2.8px -1.1px 0 var(--o),
+      1.1px 2.8px 0 var(--o), -1.1px 2.8px 0 var(--o), 1.1px -2.8px 0 var(--o), -1.1px -2.8px 0 var(--o),
+      0 var(--d) 0 var(--o), 2px var(--d) 0 var(--o), -2px var(--d) 0 var(--o);
+  }
+
+  .device {
+    position: relative; z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    background: var(--paper);
+    border: var(--line);
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 18px 40px rgba(23,18,28,.35), 0 4px 10px rgba(23,18,28,.2);
+  }
+
+  svg.i { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- 카드 헤더 (HUD) ---------- */
+  .hud {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 18px 12px;
+    background: var(--yellow);
+    border-bottom: var(--line);
+  }
+  .clock { display: flex; align-items: center; gap: 8px; font-size: 22px; }
+  #time {
+    font: 400 38px/1 var(--cap);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.4ch;
+    color: var(--ink);
+  }
+  .clock.low #time { color: var(--pink); animation: pulse .5s ease-in-out infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
+
+  .steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .steps li {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center;
+    font-size: 18px;
+    background: var(--paper); color: #B8AEBD;
+    border: 2.5px solid var(--ink);
+    transition: background .25s, color .25s, transform .35s var(--pop);
+  }
+  .steps li.now { background: var(--pink); color: #fff; transform: translateY(-3px) rotate(-6deg); }
+  .steps li.done { background: var(--ink); color: var(--yellow); animation: pop .4s var(--pop); }
+  @keyframes pop { 0% { transform: scale(.5); } 100% { transform: scale(1); } }
+
+  .timebar { height: 10px; background: var(--paper-2); border-bottom: var(--line); }
+  #timefill { height: 100%; width: 100%; background: var(--ink); transition: background-color .3s; }
+  #timefill.mid { background: var(--yellow-d); }
+  #timefill.low { background: var(--pink); }
+
+  /* ---------- Stage ---------- */
+  #stage { position: relative; min-height: 430px; display: flex; padding: 20px 20px 24px; }
+  .scene {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    animation: enter .45s var(--ease-out) both;
+  }
+  @keyframes enter { from { opacity: 0; transform: translateY(26px) rotate(1.5deg); } }
+  .shake { animation: shake .32s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+
+  /* 미션 제목 = 자막이 '팡' 하고 박힘 */
+  h1 {
+    margin: 2px 0 8px; font-size: 31px; line-height: 1.15; color: #fff; text-wrap: balance;
+    animation: stamp .5s var(--pop) .08s both;
+  }
+  h1.yellow { color: var(--yellow); }
+  @keyframes stamp { from { opacity: 0; transform: scale(1.6) rotate(-4deg); } }
+  .desc { margin: 6px 0 4px; color: var(--ink-soft); font-size: 15px; line-height: 1.55; text-wrap: balance; }
+  .desc b { color: var(--ink); }
+  .rule {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin: 8px 0 0; padding: 6px 12px 5px; border-radius: 8px;
+    background: var(--ink); color: var(--yellow);
+    font: 400 14px/1 var(--cap); letter-spacing: .01em;
+    transform: rotate(-1.5deg);
+  }
+  .play { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding-top: 14px; }
+
+  /* 실수 자막 (꽝!) */
+  .toast {
+    position: absolute; left: 50%; top: 42%; z-index: 5;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    color: var(--yellow); font-size: 40px; line-height: 1.05; white-space: nowrap;
+    pointer-events: none;
+    animation: toast 1.1s var(--ease-out) both;
+  }
+  .toast small { font-size: 22px; color: #fff; --d: 4px; }
+  @keyframes toast {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.9) rotate(-8deg); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-6deg); }
+    75% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-6deg); }
+    100% { opacity: 0; transform: translate(-50%, -64%) scale(.96) rotate(-6deg); }
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    font: 400 21px/1 var(--cap);
+    padding: 16px 26px 15px; border: var(--line); border-radius: 16px; cursor: pointer;
+    background: var(--yellow); color: var(--ink);
+    box-shadow: 0 5px 0 var(--ink), 0 12px 22px rgba(23,18,28,.18);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.04); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink), 0 4px 10px rgba(23,18,28,.15); }
+  .btn:disabled { filter: saturate(.25) brightness(1.05); cursor: default; }
+  .btn.pink { background: var(--pink); color: #fff; }
+  .btn.ghost { background: var(--paper); }
+  button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+
+  /* ---------- Intro ---------- */
+  .logo {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 4px 0 4px; line-height: .92;
+    transform: rotate(-3deg);
+    animation: stamp .55s var(--pop) both;
+  }
+  .logo .n { font-size: 82px; color: var(--yellow); --d: 8px; }
+  .logo .w { font-size: 50px; color: #fff; margin-top: -4px; }
+  .tagline {
+    margin: 14px 0 0; padding: 7px 14px 6px; border-radius: 8px;
+    background: var(--pink); color: #fff; font: 400 16px/1.2 var(--cap);
+    transform: rotate(1.5deg);
+  }
+  /* 큐시트(진행표) */
+  .cue { list-style: none; margin: 20px 0 18px; padding: 0; width: 100%; text-align: left; counter-reset: cue; }
+  .cue li {
+    display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 12px;
+    padding: 10px 2px; border-bottom: 2px dashed var(--rule);
+  }
+  .cue li:first-child { border-top: 2px dashed var(--rule); }
+  .cue li::before {
+    counter-increment: cue; content: counter(cue);
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font: 400 18px/1 var(--cap); color: #fff; background: var(--ink);
+  }
+  .cue strong { display: block; font: 400 18px/1.2 var(--cap); }
+  .cue span { font-size: 13px; color: var(--ink-soft); }
+
+  .diff-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .diff {
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    padding: 15px 4px 12px; border: var(--line); border-radius: 16px; cursor: pointer;
+    font: 400 21px/1 var(--cap); letter-spacing: .02em;
+    box-shadow: 0 5px 0 var(--ink), 0 12px 22px rgba(23,18,28,.18);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+  }
+  .diff small { font: 700 12px/1.2 var(--body); letter-spacing: 0; opacity: .85; font-variant-numeric: tabular-nums; }
+  .diff:hover { filter: brightness(1.05); }
+  .diff:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .diff:disabled { filter: saturate(.25); cursor: default; }
+  .diff.easy { background: var(--yellow); color: var(--ink); }
+  .diff.normal { background: var(--pink); color: #fff; }
+  .diff.hard { background: var(--ink); color: var(--yellow); box-shadow: 0 5px 0 var(--pink-d), 0 12px 22px rgba(23,18,28,.18); }
+  .diff.hard:active { box-shadow: 0 1px 0 var(--pink-d); }
+  .diff-tag {
+    display: inline-block; padding: 5px 10px 4px; border-radius: 7px; border: 2.5px solid var(--ink);
+    font: 400 14px/1 var(--cap); letter-spacing: .04em; transform: rotate(-3deg);
+  }
+  .diff-tag.easy { background: var(--yellow); }
+  .diff-tag.normal { background: var(--pink); color: #fff; }
+  .diff-tag.hard { background: var(--ink); color: var(--yellow); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .btn-row .btn { padding: 15px 18px 14px; font-size: 19px; }
+  .hint { margin: 16px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .hint kbd {
+    font: 700 12px var(--body); padding: 2px 7px; border-radius: 6px;
+    background: var(--paper-2); border: 1.5px solid var(--ink); border-bottom-width: 3px;
+  }
+  @media (pointer: coarse) { .hint { display: none; } }
+
+  /* ---------- Mission 1: 딱 N번 ---------- */
+  .mash {
+    position: relative; overflow: hidden;
+    width: 184px; height: 184px; border-radius: 50%; border: 4px solid var(--ink); cursor: pointer;
+    background: var(--pink); color: #fff;
+    box-shadow: 0 9px 0 var(--ink), 0 22px 36px rgba(23,18,28,.25);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: transform .06s, box-shadow .06s, background .2s;
+  }
+  .mash:active { transform: translateY(7px); box-shadow: 0 2px 0 var(--ink), 0 8px 16px rgba(23,18,28,.2); }
+  .mash-num { position: relative; z-index: 1; font-size: 76px; line-height: 1; }
+  .mash-label { position: relative; z-index: 1; font: 400 17px/1 var(--cap); margin-top: 6px; }
+  .mash-fill { position: absolute; inset: auto 0 0 0; height: 0; background: rgba(255,255,255,.35); }
+  .mash.wait { background: var(--yellow); color: var(--ink); }
+  .mash.wait .mash-num { color: var(--pink); font-size: 46px; }
+  .mash.wait .mash-fill { height: 100%; transition: height .5s linear; }
+  .dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 220px; }
+  .dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--paper-2); border: 2px solid var(--ink); transition: background .12s, transform .25s var(--pop); }
+  .dots i.on { background: var(--pink); transform: scale(1.15); }
+  .dots.full i { background: var(--yellow); }
+
+  /* ---------- Mission 2: 순서대로 ---------- */
+  .next { font: 400 18px/1 var(--cap); color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+  .next b { font-weight: 400; font-size: 34px; color: var(--cyan); }
+  .field {
+    position: relative; width: 100%; height: 260px; border-radius: 18px; border: var(--line);
+    background:
+      radial-gradient(var(--rule) 1.6px, transparent 1.8px) 0 0 / 16px 16px,
+      var(--paper-2);
+  }
+  .num {
+    position: absolute; width: var(--size, 60px); height: var(--size, 60px); border-radius: 50%; padding: 0; cursor: pointer;
+    border: calc(var(--size, 60px) * .05 + 1px) solid var(--ink);
+    background: var(--cyan); color: var(--ink); font: 400 calc(var(--size, 60px) * .48)/1 var(--cap);
+    box-shadow: 0 calc(var(--size, 60px) * .07) 0 var(--ink);
+    transition: transform .06s, box-shadow .06s;
+    animation: appear .35s var(--pop) both;
+  }
+  .num:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+  .num.hit { animation: vanish .25s var(--ease-out) forwards; pointer-events: none; }
+  @keyframes appear { from { opacity: 0; transform: scale(.3); } }
+  @keyframes vanish { to { opacity: 0; transform: scale(1.6) rotate(12deg); } }
+
+  /* ---------- Mission 3: 타이밍 ---------- */
+  .track {
+    position: relative; width: 100%; height: 68px; border-radius: 16px; border: var(--line);
+    background: var(--paper-2);
+  }
+  .zone {
+    position: absolute; top: 7px; bottom: 7px; border-radius: 8px;
+    background: repeating-linear-gradient(-45deg, var(--green) 0 8px, #5BE39A 8px 16px);
+    box-shadow: inset 0 0 0 2.5px var(--ink);
+  }
+  .cursor {
+    position: absolute; top: -9px; bottom: -9px; width: 12px; margin-left: -6px; border-radius: 99px;
+    background: var(--ink); box-shadow: 0 3px 8px rgba(23,18,28,.35);
+    transition: background .15s;
+  }
+  .track.frozen .cursor { background: var(--pink); }
+  .track.frozen { animation: shake .32s; }
+  .btn.locked { background: var(--paper-2); color: var(--ink-soft); }
+
+  /* ---------- Result ---------- */
+  .result-cap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 18px 0 2px; }
+  .result-cap h1 { font-size: 48px; margin: 0; transform: rotate(-3deg); }
+  .result-cap.lose h1 { color: var(--pink); }
+  .big-time {
+    font: 400 78px/1 var(--cap); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; margin: 14px 0 6px;
+  }
+  .big-time small { font-size: 28px; margin-left: 4px; color: var(--ink-soft); }
+  .record {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 99px; margin: 6px 0 24px;
+    font-size: 14px; font-weight: 700;
+    background: var(--paper-2); color: var(--ink-soft);
+  }
+  /* 신기록 = 비스듬히 붙는 스티커 */
+  .record.new {
+    border-radius: 10px; border: var(--line);
+    background: var(--yellow); color: var(--ink);
+    font: 400 20px/1 var(--cap); padding: 9px 16px 8px;
+    animation: sticker .6s var(--pop) .35s both;
+  }
+  @keyframes sticker { from { opacity: 0; transform: scale(2.2) rotate(-14deg); } to { transform: rotate(-5deg); } }
+  .progress-row { display: flex; gap: 10px; margin: 18px 0 24px; }
+  .progress-row span {
+    width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+    font-size: 24px; background: var(--paper-2); color: #B8AEBD; border: 2.5px solid var(--rule);
+  }
+  .progress-row span.done { background: var(--ink); color: var(--yellow); border-color: var(--ink); }
+  .progress-row span.fail { background: var(--pink); color: #fff; border-color: var(--ink); transform: rotate(-6deg); }
+  .spacer { flex: 1; }
+
+  /* ---------- 레벨 / 경험치 ---------- */
+  .lv { width: 100%; display: flex; align-items: center; gap: 12px; margin: 0 0 14px; text-align: left; }
+  .lv-badge {
+    flex: none; min-width: 64px; text-align: center;
+    padding: 8px 10px 7px; border-radius: 10px; border: 2.5px solid var(--ink);
+    background: var(--ink); color: var(--yellow);
+    font: 400 19px/1 var(--cap); letter-spacing: .02em; font-variant-numeric: tabular-nums;
+    transform: rotate(-3deg);
+  }
+  .lv-badge.up { animation: lvup .55s var(--pop); }
+  @keyframes lvup { 0% { transform: scale(1.8) rotate(-12deg); background: var(--yellow); color: var(--ink); } 100% { transform: rotate(-3deg); } }
+  .lv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .lv-bar { height: 16px; border-radius: 99px; border: 2.5px solid var(--ink); background: var(--paper-2); overflow: hidden; }
+  .lv-fill { display: block; height: 100%; background: var(--cyan); border-right: 2.5px solid var(--ink); transition: width .7s var(--ease-out); }
+  .lv-fill[style*="width:0%"], .lv-fill[style*="width: 0%"] { border-right: 0; }
+  .lv-num { font: 700 12px/1 var(--body); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  /* 전체 레벨 = 게임 레벨 아래 한 줄 작게 */
+  .lv + .lv.small { margin-top: -6px; }
+  .lv.small .lv-badge { min-width: 64px; padding: 5px 8px 4px; font-size: 14px; background: var(--paper); color: var(--ink); transform: none; }
+  .lv.small .lv-bar { height: 10px; border-width: 2px; }
+  .lv.small .lv-fill { background: var(--yellow); border-right-width: 2px; }
+
+  /* 메인(홈)으로 */
+  .home {
+    position: fixed; top: 10px; right: 16px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px 6px; border-radius: 99px; border: 2.5px solid var(--ink);
+    background: var(--paper); color: var(--ink); text-decoration: none;
+    font: 400 14px/1 var(--cap); box-shadow: 0 3px 0 var(--ink);
+  }
+  .home:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .home:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+  body[data-state="play"] .home { opacity: .55; }
+  .exp-gain { margin: 4px 0 0; font-size: 34px; color: var(--cyan); --d: 4px; transform: rotate(-2deg); animation: stamp .5s var(--pop) .5s both; }
+  .exp-calc { margin: 6px 0 14px; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 380px) {
+    #stage { padding: 16px 14px 20px; }
+    .hud { padding: 12px 14px 10px; }
+    .logo .n { font-size: 68px; }
+    .logo .w { font-size: 42px; }
+    .mash { width: 160px; height: 160px; }
+    .mash-num { font-size: 62px; }
+    .diff { font-size: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="bug" aria-hidden="true"><i></i><b>LIVE</b>15초 미션</div>
+<a class="home" href="../index.html"><svg class="i" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9"/></svg>홈</a>
+<main class="device">
+  <header class="hud">
+    <div class="clock" id="clock">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="14" r="8"/><path d="M12 14V10M10 2h4M12 2v4M19 7l1.5-1.5"/></svg>
+      <span id="time">15.00</span>
+    </div>
+    <ol class="steps" id="steps"></ol>
+  </header>
+  <div class="timebar"><div id="timefill"></div></div>
+  <section id="stage" aria-live="polite"></section>
+</main>
+
+<script src="../shared.js"></script>
+<script>
+const LIMIT = 15;
+const stage = document.getElementById('stage');
+const clockEl = document.getElementById('clock');
+const timeEl = document.getElementById('time');
+const fillEl = document.getElementById('timefill');
+const stepsEl = document.getElementById('steps');
+
+const ICON = {
+  tap:   '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="8.5" stroke-dasharray="3 3.2"/></svg>',
+  route: '<svg class="i" viewBox="0 0 24 24"><path d="M6 18 12 7l6 8"/><circle cx="6" cy="18" r="2.6"/><circle cx="12" cy="7" r="2.6"/><circle cx="18" cy="15" r="2.6"/></svg>',
+  aim:   '<svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5"/><path d="M14 4.5v15"/></svg>',
+  check: '<svg class="i" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  cross: '<svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  retry: '<svg class="i" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v5h5"/></svg>',
+  play:  '<svg class="i" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>',
+  trophy:'<svg class="i" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5v1.5A3.5 3.5 0 0 0 8 11M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11M12 13v4M8.5 20h7"/></svg>',
+  lock:  '<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  reset: '<svg class="i" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v5h5"/></svg>',
+};
+
+// ---------- 난이도 ----------
+// tapGoal: 1단계 필요 횟수 / hideFrom: 이 횟수부터 카운트를 ??로 표시 (0 = 숨기지 않음)
+// numCount, numSize: 2단계 버튼 개수와 크기(px) / speed: 3단계 막대 속도(%/초), zoneW: 초록 구역 폭(%)
+// expRate, expBase: 클리어 경험치 = 남은 시간(초) × expRate + expBase
+const DIFFS = {
+  easy:   { label: 'Easy',   key: 'best15',        tapGoal: 10, hideFrom: 0,  numCount: 5,  numSize: 60, speed: 110, zoneW: 18,      expRate: 100, expBase: 0 },
+  normal: { label: 'Normal', key: 'best15_normal', tapGoal: 15, hideFrom: 10, numCount: 7,  numSize: 42, speed: 220, zoneW: 18 * .8, expRate: 200, expBase: 1000 },
+  hard:   { label: 'Hard',   key: 'best15_hard',   tapGoal: 20, hideFrom: 1,  numCount: 10, numSize: 30, speed: 330, zoneW: 18 * .6, expRate: 400, expBase: 3000 },
+};
+let diffId = 'easy';
+let D = DIFFS.easy;
+
+let startAt = 0, rafId = 0, running = false, missionIdx = 0, cleanup = null;
+
+function loadBest(id = diffId) { try { return parseFloat(localStorage.getItem(DIFFS[id].key)) || null; } catch { return null; } }
+function saveBest(t) { try { localStorage.setItem(D.key, t); } catch {} }
+
+// ---------- 레벨 (계산·저장은 shared.js) ----------
+const GAME = GAMES.find(g => g.id === 'mission15');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// label: 바 아래 숫자 앞에 붙는 이름 ('15초 미션' / '전체')
+function lvHTML(s, id, label, small = false) {
+  const need = needExp(s.lv);
+  return `<div class="lv ${small ? 'small' : ''}" id="${id}" data-label="${label}">
+    <span class="lv-badge">Lv.${s.lv}</span>
+    <div class="lv-main">
+      <div class="lv-bar"><i class="lv-fill" style="width:${s.exp / need * 100}%"></i></div>
+      <span class="lv-num">${label} · ${fmt(s.exp)} / ${fmt(need)} EXP</span>
+    </div>
+  </div>`;
+}
+
+// 결과 화면에서 경험치 바를 이전 상태 → 새 상태로 채움 (레벨업 시 한 칸씩 꽉 채우고 넘어감)
+async function playExp(id, from, to) {
+  const el = stage.querySelector('#' + id);
+  if (!el) return;
+  const badge = el.querySelector('.lv-badge'), fill = el.querySelector('.lv-fill'), num = el.querySelector('.lv-num');
+  const label = el.dataset.label;
+  await sleep(700);
+  for (let lv = from.lv; lv < to.lv; lv++) {
+    if (!el.isConnected) return;
+    fill.style.width = '100%';
+    num.textContent = `${label} · ${fmt(needExp(lv))} / ${fmt(needExp(lv))} EXP`;
+    await sleep(750);
+    if (!el.isConnected) return;
+    badge.textContent = `Lv.${lv + 1}`;
+    badge.classList.remove('up'); void badge.offsetWidth; badge.classList.add('up');
+    fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = '';
+  }
+  if (!el.isConnected) return;
+  fill.style.width = (to.exp / needExp(to.lv) * 100) + '%';
+  num.textContent = `${label} · ${fmt(to.exp)} / ${fmt(needExp(to.lv))} EXP`;
+}
+
+async function playAllExp({ all, game }) {
+  await Promise.all([playExp('lv-game', game.from, game.to), playExp('lv-all', all.from, all.to)]);
+  if (!stage.querySelector('#lv-game')) return;
+  // 둘 다 오르면 전체 레벨 업을 우선 보여줌
+  if (all.to.lv > all.from.lv) toast('레벨 업!', `전체 Lv.${all.to.lv} 달성`);
+  else if (game.to.lv > game.from.lv) toast('레벨 업!', `${GAME.title} Lv.${game.to.lv} 달성`);
+}
+
+function lvBlock() {
+  return lvHTML(loadLv(GAME.lvKey), 'lv-game', GAME.title) + lvHTML(loadLv(), 'lv-all', '전체', true);
+}
+
+function renderSteps() {
+  stepsEl.innerHTML = MISSIONS.map((m, i) => {
+    const cls = i < missionIdx ? 'done' : (i === missionIdx && running ? 'now' : '');
+    return `<li class="${cls}" aria-label="미션 ${i + 1}">${i < missionIdx ? ICON.check : ICON[m.icon]}</li>`;
+  }).join('');
+}
+
+function shake(el = stage) {
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+}
+
+// 실수하면 예능 자막처럼 큰 글씨가 비스듬히 박힘
+function toast(big, small) {
+  stage.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast cap';
+  t.setAttribute('role', 'status');
+  t.innerHTML = `${big}<small>${small}</small>`;
+  stage.appendChild(t);
+  t.addEventListener('animationend', () => t.remove());
+}
+
+function onSpace(fn) {
+  const h = e => { if (e.code === 'Space' && !e.repeat) { e.preventDefault(); fn(); } };
+  window.addEventListener('keydown', h);
+  return () => window.removeEventListener('keydown', h);
+}
+
+// ---------- 미션 정의 ----------
+const MISSIONS = [
+  {
+    name: () => `딱 ${D.tapGoal}번`,
+    icon: 'tap', color: 'c1',
+    menuTitle: '정해진 횟수만큼 누르기',
+    title: () => `딱 ${D.tapGoal}번 누르기`,
+    desc: () => `정확히 ${D.tapGoal}번 누르고 0.5초 기다리세요.` + (
+      D.hideFrom === 1 ? '<br>누르는 순간부터 숫자가 가려져요!'
+      : D.hideFrom ? `<br>${D.hideFrom}번째부터는 숫자가 가려져요!` : ''),
+    rule: '더 누르면 처음부터',
+    start(done, play) {
+      const GOAL = D.tapGoal;
+      const hidden = n => D.hideFrom > 0 && n >= D.hideFrom;
+      let count = 0, waitId = 0;
+      play.innerHTML = `
+        <button class="mash" id="mash" aria-label="누르기">
+          <i class="mash-fill"></i>
+          <span class="mash-num cap">${GOAL}</span>
+          <span class="mash-label">남음</span>
+        </button>
+        <div class="dots">${'<i></i>'.repeat(GOAL)}</div>`;
+      const btn = play.querySelector('#mash');
+      const num = btn.querySelector('.mash-num');
+      const label = btn.querySelector('.mash-label');
+      const dotsWrap = play.querySelector('.dots');
+      const dots = dotsWrap.querySelectorAll('i');
+      const hit = () => {
+        if (count >= GOAL) {
+          // 초과 입력 → 리셋
+          clearTimeout(waitId);
+          count = 0;
+          btn.classList.remove('wait');
+          dotsWrap.classList.remove('full');
+          dots.forEach(d => d.classList.remove('on'));
+          num.textContent = GOAL;
+          label.textContent = '남음';
+          toast('꽝!', '너무 많이 눌렀다! 처음부터');
+          shake();
+          return;
+        }
+        count++;
+        if (hidden(count)) {
+          num.textContent = '??';
+        } else {
+          dots[count - 1].classList.add('on');
+          num.textContent = GOAL - count;
+        }
+        if (count === GOAL) {
+          num.textContent = '멈춰!';
+          label.textContent = '손 떼고 기다려';
+          btn.classList.add('wait');
+          dotsWrap.classList.add('full');
+          waitId = setTimeout(done, 500);
+        }
+      };
+      btn.addEventListener('pointerdown', hit);
+      const off = onSpace(hit);
+      return () => { clearTimeout(waitId); off(); };
+    }
+  },
+  {
+    name: () => '순서대로',
+    icon: 'route', color: 'c2',
+    menuTitle: '숫자 순서대로 누르기',
+    title: () => `1부터 ${D.numCount}까지 순서대로`,
+    desc: () => '흩어진 숫자를 작은 수부터 누르세요.',
+    rule: '틀리면 1부터 다시',
+    start(done, play) {
+      play.innerHTML = '<div class="next">다음 숫자 <b id="next">1</b></div><div class="field" id="field"></div>';
+      const field = play.querySelector('#field');
+      const nextEl = play.querySelector('#next');
+      const COUNT = D.numCount, SIZE = D.numSize, PAD = 8, GAP = SIZE + 16;
+      field.style.setProperty('--size', SIZE + 'px');
+      const w = field.clientWidth - SIZE - PAD * 2, h = field.clientHeight - SIZE - PAD * 2;
+      const placed = [];
+      let next = 1;
+      for (let n = 1; n <= COUNT; n++) {
+        let x, y, tries = 0;
+        do {
+          x = PAD + Math.random() * w; y = PAD + Math.random() * h; tries++;
+        } while (tries < 150 && placed.some(p => Math.hypot(p.x - x, p.y - y) < GAP));
+        placed.push({ x, y });
+        const b = document.createElement('button');
+        b.className = 'num';
+        b.textContent = n;
+        b.style.left = x + 'px';
+        b.style.top = y + 'px';
+        b.style.animationDelay = (n * 30) + 'ms';
+        b.addEventListener('pointerdown', () => {
+          if (n === next) {
+            b.classList.add('hit');
+            if (++next > COUNT) done();
+            else nextEl.textContent = next;
+          } else if (!b.classList.contains('hit')) {
+            // 순서 틀림 → 1부터 다시
+            next = 1;
+            nextEl.textContent = 1;
+            field.querySelectorAll('.num').forEach(el => {
+              el.classList.remove('hit');
+              el.style.animationDelay = '0ms';
+            });
+            toast('땡!', '순서 틀림! 1부터 다시');
+            shake();
+          }
+        });
+        field.appendChild(b);
+      }
+    }
+  },
+  {
+    name: () => '타이밍',
+    icon: 'aim', color: 'c3',
+    menuTitle: '초록 구역에서 멈추기',
+    title: () => '초록 구역에서 멈추기',
+    desc: () => '막대가 초록 구역에 들어왔을 때 누르세요.',
+    rule: '놓치면 0.5초 잠김',
+    start(done, play) {
+      play.innerHTML = `
+        <div class="track" id="track"><div class="zone" id="zone"></div><div class="cursor" id="cursor"></div></div>
+        <button class="btn pink" id="stop">멈춰!</button>`;
+      const track = play.querySelector('#track');
+      const zone = play.querySelector('#zone');
+      const cursor = play.querySelector('#cursor');
+      const stopBtn = play.querySelector('#stop');
+      const zoneW = D.zoneW;
+      // 초록 구역은 항상 중앙(50%)보다 오른쪽에만 생성 → 첫 도달 시간이 일정해 운 요소 최소화
+      const zoneX = 52 + Math.random() * (98 - zoneW - 52);
+      zone.style.left = zoneX + '%';
+      zone.style.width = zoneW + '%';
+      let pos = 0, dir = 1, last = performance.now(), id = 0, finished = false, frozenUntil = 0, unlockId = 0;
+      const speed = D.speed; // %/초
+      const tick = now => {
+        if (now >= frozenUntil) pos += dir * speed * (now - last) / 1000;
+        last = now;
+        if (pos >= 100) { pos = 100; dir = -1; }
+        if (pos <= 0) { pos = 0; dir = 1; }
+        cursor.style.left = pos + '%';
+        id = requestAnimationFrame(tick);
+      };
+      id = requestAnimationFrame(tick);
+      const press = () => {
+        if (finished || performance.now() < frozenUntil) return;
+        if (pos >= zoneX && pos <= zoneX + zoneW) {
+          finished = true;
+          done();
+        } else {
+          // 놓침 → 0.5초간 정지 + 입력 불가
+          frozenUntil = performance.now() + 500;
+          track.classList.remove('frozen'); void track.offsetWidth;
+          track.classList.add('frozen');
+          stopBtn.classList.add('locked');
+          stopBtn.innerHTML = ICON.lock + '잠김';
+          toast('놓쳤다!', '0.5초 잠김');
+          clearTimeout(unlockId);
+          unlockId = setTimeout(() => {
+            track.classList.remove('frozen');
+            stopBtn.classList.remove('locked');
+            stopBtn.textContent = '멈춰!';
+          }, 500);
+        }
+      };
+      stopBtn.addEventListener('pointerdown', press);
+      const off = onSpace(press);
+      return () => { cancelAnimationFrame(id); clearTimeout(unlockId); off(); };
+    }
+  }
+];
+
+// ---------- 게임 흐름 ----------
+function clearStage() {
+  if (cleanup) { cleanup(); cleanup = null; }
+  stage.innerHTML = '';
+}
+
+function scene(html) {
+  const s = document.createElement('div');
+  s.className = 'scene';
+  s.innerHTML = html;
+  stage.appendChild(s);
+  return s;
+}
+
+function runMission() {
+  clearStage();
+  renderSteps();
+  const m = MISSIONS[missionIdx];
+  const s = scene(`
+    <h1 class="cap">${m.title()}</h1>
+    <p class="desc">${m.desc()}</p>
+    <span class="rule">${ICON.reset}${m.rule}</span>
+    <div class="play"></div>`);
+  cleanup = m.start(() => {
+    missionIdx++;
+    if (missionIdx >= MISSIONS.length) finish(true);
+    else runMission();
+  }, s.querySelector('.play')) || null;
+}
+
+function setTimeUI(left) {
+  timeEl.textContent = left.toFixed(2);
+  clockEl.classList.toggle('low', left > 0 && left < 5);
+  fillEl.style.width = (left / LIMIT * 100) + '%';
+  fillEl.classList.toggle('mid', left <= 10 && left > 5);
+  fillEl.classList.toggle('low', left <= 5);
+}
+
+function loop(now) {
+  const left = Math.max(0, LIMIT - (now - startAt) / 1000);
+  setTimeUI(left);
+  if (left <= 0) { finish(false); return; }
+  rafId = requestAnimationFrame(loop);
+}
+
+function start(id = diffId) {
+  diffId = id;
+  D = DIFFS[id];
+  document.body.dataset.state = 'play';
+  missionIdx = 0;
+  running = true;
+  startAt = performance.now();
+  rafId = requestAnimationFrame(loop);
+  runMission();
+}
+
+function bindGo(delay) {
+  const btns = [...stage.querySelectorAll('[data-diff], #go, #menu')];
+  btns.forEach(b => b.addEventListener('click', () => {
+    if (b.id === 'menu') { clearStage(); document.body.dataset.state = ''; intro(); }
+    else start(b.dataset.diff || diffId);
+  }));
+  const first = btns[0];
+  if (delay) {
+    // 연타하던 스페이스바로 바로 재시작되는 것을 막음
+    btns.forEach(b => b.disabled = true);
+    setTimeout(() => { btns.forEach(b => b.disabled = false); first.focus(); }, delay);
+  } else {
+    first.focus();
+  }
+}
+
+function finish(win) {
+  running = false;
+  cancelAnimationFrame(rafId);
+  clearStage();
+  const used = (performance.now() - startAt) / 1000;
+  document.body.dataset.state = win ? 'win' : 'lose';
+  renderSteps();
+  if (win) {
+    const best = loadBest();
+    const isBest = best === null || used < best;
+    if (isBest) saveBest(used.toFixed(2));
+    // 화면에 보이는 기록 기준으로 남은 시간을 계산해야 식과 결과가 맞음
+    const left = Math.max(0, LIMIT - Number(used.toFixed(2)));
+    const gain = Math.round(left * D.expRate + D.expBase);
+    const before = { game: loadLv(GAME.lvKey), all: loadLv() };
+    const change = giveExp(GAME.lvKey, gain);
+    scene(`
+      <div class="result-cap"><h1 class="cap yellow">미션 클리어!</h1></div>
+      <div class="big-time">${used.toFixed(2)}<small>초</small></div>
+      <span class="diff-tag ${diffId}">${D.label}</span>
+      <span class="record ${isBest ? 'new' : ''}">${ICON.trophy}${isBest ? '최고 기록 달성!' : `최고 기록 ${best.toFixed(2)}초`}</span>
+      <div class="exp-gain cap">+${fmt(gain)} EXP</div>
+      <p class="exp-calc">남은 ${left.toFixed(2)}초 × ${D.expRate}${D.expBase ? ` + ${fmt(D.expBase)}` : ''}</p>
+      ${lvHTML(before.game, 'lv-game', GAME.title)}${lvHTML(before.all, 'lv-all', '전체', true)}
+      <div class="spacer"></div>
+      ${resultButtons()}`);
+    playAllExp(change);
+  } else {
+    setTimeUI(0);
+    const failed = MISSIONS[missionIdx];
+    scene(`
+      <div class="result-cap lose"><h1 class="cap">시간 초과!</h1></div>
+      <p class="desc"><span class="diff-tag ${diffId}">${D.label}</span>&nbsp; <b>'${failed.name()}'</b> 미션에서 멈췄어요.</p>
+      <div class="progress-row">${MISSIONS.map((m, i) =>
+        `<span class="${i < missionIdx ? 'done' : i === missionIdx ? 'fail' : ''}">${i < missionIdx ? ICON.check : ICON[m.icon]}</span>`).join('')}</div>
+      ${lvBlock()}
+      <div class="spacer"></div>
+      ${resultButtons()}`);
+  }
+  bindGo(600);
+}
+
+function resultButtons() {
+  return `<div class="btn-row">
+    <button class="btn" id="go">${ICON.retry}다시 도전</button>
+    <button class="btn ghost" id="menu">난이도 선택</button>
+  </div>`;
+}
+
+function intro() {
+  missionIdx = 0;
+  renderSteps();
+  setTimeUI(LIMIT);
+  scene(`
+    <h1 class="logo" aria-label="15초 미션"><span class="cap n">15초</span><span class="cap w">미션</span></h1>
+    <p class="tagline">15초 안에 미니게임 3개를 모두 깨라!</p>
+    <ol class="cue">${MISSIONS.map(m => `
+      <li><div><strong>${m.menuTitle}</strong><span>${m.rule}</span></div></li>`).join('')}
+    </ol>
+    <div class="spacer"></div>
+    ${lvBlock()}
+    <div class="diff-row">${Object.entries(DIFFS).map(([id, d]) => {
+      const best = loadBest(id);
+      return `<button class="diff ${id}" data-diff="${id}" aria-label="${d.label} 시작하기">
+        ${d.label}<small>${best ? `최고 ${best.toFixed(2)}초` : '시작하기'}</small></button>`;
+    }).join('')}</div>
+    <p class="hint"><kbd>Space</kbd> 로도 조작할 수 있어요</p>`);
+  bindGo(0);
+}
+
+intro();
+</script>
+</body>
+</html>

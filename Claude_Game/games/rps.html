@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>가위바위보</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<style>
+  /* 손그림 종이 놀이 — 책상 위 공책 + 볼펜 낙서 + 빨간 펜 채점 */
+  :root {
+    --desk: #E2D2B2;    --desk-d: #CDB98F;
+    --paper: #FFFEF7;   --rule: #C9DCEF;   --margin: #F1A7A0;
+    --ink: #27314F;     --ink-soft: #5F6782; --ink-faint: #9AA0B4;
+    --red: #DE3E2E;     --hl: #FFE27A;     --hl-blue: #BFE6FF;
+    --hand: "Gaegu", "Nanum Pen Script", "Comic Sans MS", cursive;
+    --pen: "Nanum Pen Script", "Gaegu", cursive;
+    --wobble: 255px 14px 225px 16px / 16px 225px 14px 255px;
+    --ease-out: cubic-bezier(.16, 1, .3, 1);
+    --pop: cubic-bezier(.34, 1.56, .64, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: grid; place-items: center;
+    padding: 24px 16px;
+    font-family: var(--hand); color: var(--ink);
+    background:
+      repeating-linear-gradient(92deg, transparent 0 46px, rgba(120,90,40,.05) 46px 48px),
+      repeating-linear-gradient(88deg, transparent 0 120px, rgba(120,90,40,.04) 120px 123px),
+      var(--desk);
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  ::selection { background: var(--hl); }
+
+  /* ---------- 공책 한 장 ---------- */
+  .page {
+    position: relative; width: 100%; max-width: 440px;
+    padding: 18px 20px 24px 46px;
+    background:
+      linear-gradient(90deg, transparent 33px, var(--margin) 33px 35px, transparent 35px),
+      repeating-linear-gradient(180deg, transparent 0 31px, var(--rule) 31px 32px) 0 14px,
+      var(--paper);
+    border-radius: 4px 6px 6px 4px;
+    box-shadow: 0 1px 0 #EDE6D3, 0 2px 0 #fff, 0 3px 0 #E7DFC9, 0 18px 36px rgba(70,50,20,.25);
+    transform: rotate(-.6deg);
+  }
+  /* 스프링 구멍 */
+  .page::before {
+    content: ""; position: absolute; left: 10px; top: 26px; bottom: 26px; width: 12px;
+    background: radial-gradient(circle, var(--desk-d) 4.5px, transparent 5px) 0 0 / 12px 44px repeat-y;
+  }
+  .pg-head { display: flex; align-items: center; justify-content: space-between; height: 30px; }
+  .home {
+    font: 700 18px/1 var(--hand); color: var(--ink-soft); text-decoration: none;
+    padding: 4px 8px; margin-left: -8px; border-radius: 6px;
+  }
+  .home:hover { color: var(--ink); background: var(--hl-blue); }
+  .home:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+  .mode {
+    font: 700 16px/1 var(--hand); padding: 4px 10px 3px;
+    border: 2px solid var(--ink); border-radius: var(--wobble); transform: rotate(2deg);
+  }
+
+  #stage { min-height: 560px; display: flex; flex-direction: column; }
+  .scene { flex: 1; display: flex; flex-direction: column; animation: turn .4s var(--ease-out) both; }
+  @keyframes turn { from { opacity: 0; transform: translateY(14px); } }
+
+  h1.title { margin: 14px 0 0; font: 400 64px/1 var(--pen); letter-spacing: .02em; }
+  h1.title mark { background: linear-gradient(transparent 55%, var(--hl) 55% 90%, transparent 90%); color: inherit; padding: 0 4px; }
+  .sub { margin: 6px 0 0; font-size: 19px; color: var(--ink-soft); line-height: 1.3; }
+
+  .doodle { display: block; width: 100%; height: 100%; overflow: visible; }
+  .doodle .ln { fill: none; stroke: var(--ink); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+  .doodle .fl { stroke: var(--ink); stroke-width: 3.2; stroke-linejoin: round; }
+  .rough { filter: url(#rough); }
+
+  .trio { display: flex; justify-content: center; gap: 22px; margin: 18px 0 6px; }
+  .trio span { width: 76px; height: 76px; }
+  .trio span:nth-child(1) { transform: rotate(-8deg); }
+  .trio span:nth-child(3) { transform: rotate(7deg); }
+
+  /* 규칙 = 공책 줄에 맞춘 메모 */
+  .rules { list-style: none; margin: 10px 0 0; padding: 0; font-size: 19px; line-height: 32px; }
+  .rules li { position: relative; padding-left: 18px; }
+  .rules li::before { content: "-"; position: absolute; left: 2px; color: var(--ink-soft); }
+  .rules b { font-weight: 700; background: linear-gradient(transparent 60%, var(--hl) 60% 92%, transparent 92%); }
+  .rules small { font-size: 16px; color: var(--ink-soft); }
+  .rules .red { color: var(--red); font-weight: 700; }
+
+  /* ---------- 버튼 (손으로 그린 테두리) ---------- */
+  .pen-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 700 24px/1 var(--hand); color: var(--ink);
+    padding: 12px 26px 10px; cursor: pointer;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: var(--wobble);
+    box-shadow: 3px 4px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s, background .15s;
+  }
+  .pen-btn:hover { background: var(--hl); }
+  .pen-btn:active { transform: translate(2px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .pen-btn:focus-visible, .pick:focus-visible { outline: 2px dashed var(--red); outline-offset: 4px; }
+  .pen-btn.ghost { box-shadow: none; border-style: dashed; }
+  .btn-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .spacer { flex: 1; min-height: 14px; }
+  .best-line { margin: 10px 0 0; text-align: center; font-size: 17px; color: var(--ink-soft); }
+
+  /* ---------- 점수표 ---------- */
+  .sheet {
+    display: grid; grid-template-columns: repeat(10, 1fr);
+    margin: 10px 0 0; border: 2.5px solid var(--ink); border-radius: var(--wobble);
+    background: rgba(255,255,255,.6);
+  }
+  .cell { position: relative; display: flex; flex-direction: column; align-items: center; padding: 3px 0 4px; min-width: 0; }
+  .cell + .cell { border-left: 1.5px dashed var(--ink-faint); }
+  .cell .no { font-size: 14px; line-height: 1; color: var(--ink-faint); }
+  .cell .mk { width: 26px; height: 26px; margin: 2px 0 1px; }
+  .cell .pt { font-size: 13px; line-height: 1; height: 13px; color: var(--red); font-variant-numeric: tabular-nums; }
+  .cell.now { background: linear-gradient(transparent 70%, var(--hl) 70%); }
+  .mk path { fill: none; stroke: var(--red); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+  .mk.draw-in path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .35s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .tally { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 8px 2px 0; font-size: 18px; color: var(--ink-soft); }
+  .tally b { color: var(--ink); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .tally .total b { font-size: 30px; color: var(--red); }
+  .tally .bump { display: inline-block; animation: bump .4s var(--pop); }
+  @keyframes bump { 40% { transform: scale(1.35) rotate(-4deg); } }
+
+  /* ---------- 대결 ---------- */
+  .arena { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 14px 0 0; }
+  .side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .who { font-size: 18px; color: var(--ink-soft); }
+  .hand { width: 118px; height: 118px; display: grid; place-items: center; }
+  .hand.cpu-q { font: 400 92px/1 var(--pen); color: var(--ink-faint); }
+  .hand.shake { animation: shake .5s ease-in-out; }
+  @keyframes shake { 0%, 50%, 100% { transform: translateY(0) rotate(0); } 25%, 75% { transform: translateY(-14px) rotate(-6deg); } }
+  .hand.reveal { animation: reveal .35s var(--pop); }
+  @keyframes reveal { from { transform: scale(.6) rotate(-12deg); opacity: 0; } }
+  .hand.lost { opacity: .45; }
+  .vs { font: 400 40px/1 var(--pen); color: var(--red); transform: rotate(-8deg); padding: 0 6px; }
+
+  .verdict { position: relative; min-height: 86px; margin: 4px 0 0; text-align: center; }
+  .verdict .big { position: relative; display: inline-block; font: 400 46px/1.1 var(--pen); }
+  .verdict .big.win { color: var(--red); }
+  .verdict .big.win::after {
+    /* 빨간 펜 동그라미 (글자 크기에 맞춰 둘러쌈) */
+    content: ""; position: absolute; inset: -5px -18px -3px;
+    border: 3px solid var(--red); border-radius: 50% 48% 52% 46% / 56% 50% 50% 44%;
+    transform: rotate(-4deg); pointer-events: none;
+  }
+  .verdict .big.lose { color: var(--ink-soft); }
+  .verdict .calc { display: block; margin-top: 8px; font-size: 17px; color: var(--ink-soft); }
+  .verdict .stamp { animation: stamp .35s var(--pop) both; }
+  @keyframes stamp { from { opacity: 0; transform: scale(1.5) rotate(-6deg); } }
+
+  .picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 0; }
+  .pick {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 10px 4px 8px; cursor: pointer;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: var(--wobble);
+    box-shadow: 3px 4px 0 var(--ink);
+    font: 700 22px/1 var(--hand); color: var(--ink);
+    transition: transform .08s, box-shadow .08s, background .15s;
+  }
+  .pick:nth-child(2) { border-radius: 16px 225px 14px 255px / 225px 14px 255px 16px; }
+  .pick span { width: 62px; height: 62px; }
+  .pick kbd { font: 400 14px/1 var(--hand); color: var(--ink-faint); }
+  .pick:hover { background: var(--hl); }
+  .pick:active { transform: translate(2px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .pick:disabled { cursor: default; background: var(--paper); }
+  .pick.chosen { background: var(--hl); }
+  @media (pointer: coarse) { .pick kbd { display: none; } }
+
+  /* ---------- 결과 ---------- */
+  .final { position: relative; text-align: center; margin: 18px 0 0; }
+  .final .lbl { font-size: 20px; color: var(--ink-soft); }
+  .final .score { position: relative; display: inline-block; margin-top: 2px; padding: 0 22px; font: 400 88px/1 var(--pen); color: var(--red); font-variant-numeric: tabular-nums; }
+  .final .score::after {
+    content: ""; position: absolute; inset: 2px -4px -2px; pointer-events: none;
+    border: 3.5px solid var(--red); border-radius: 50% 46% 52% 48% / 54% 50% 48% 46%;
+    transform: rotate(-3deg);
+  }
+  .final .score small { font-size: 40px; }
+  .wdl { margin: 8px 0 0; font-size: 19px; }
+  .wdl b { font-size: 24px; }
+  .new-best {
+    display: inline-block; margin-top: 8px; padding: 4px 12px 2px;
+    font: 700 19px/1.2 var(--hand); color: var(--red);
+    border: 2.5px solid var(--red); border-radius: 6px; transform: rotate(-5deg);
+    animation: stamp .45s var(--pop) .3s both;
+  }
+  .exp-gain { margin: 14px 0 0; text-align: center; font: 400 40px/1 var(--pen); color: var(--ink); animation: stamp .45s var(--pop) .45s both; }
+  .exp-gain mark { background: linear-gradient(transparent 50%, var(--hl-blue) 50% 92%, transparent 92%); color: inherit; padding: 0 6px; }
+  .exp-calc { margin: 2px 0 10px; text-align: center; font-size: 16px; color: var(--ink-soft); }
+
+  /* ---------- 레벨 (연필 칠한 막대) ---------- */
+  .lv { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; }
+  .lv-badge {
+    flex: none; min-width: 66px; text-align: center;
+    font: 700 21px/1 var(--hand); padding: 5px 8px 3px;
+    border: 2.5px solid var(--ink); border-radius: var(--wobble); background: var(--paper);
+  }
+  .lv-badge.up { animation: stamp .5s var(--pop); background: var(--hl); }
+  .lv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .lv-bar { height: 15px; border: 2.5px solid var(--ink); border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px; overflow: hidden; background: var(--paper); }
+  .lv-fill {
+    display: block; height: 100%;
+    background: repeating-linear-gradient(-55deg, var(--ink) 0 2px, transparent 2px 5px);
+    opacity: .75; transition: width .7s var(--ease-out);
+  }
+  .lv-num { font-size: 15px; line-height: 1; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .lv.small { margin-top: 6px; }
+  .lv.small .lv-badge { font-size: 16px; padding: 3px 8px 2px; border-style: dashed; }
+  .lv.small .lv-bar { height: 10px; border-width: 2px; }
+  .lv.small .lv-fill { background: repeating-linear-gradient(-55deg, var(--red) 0 2px, transparent 2px 5px); }
+
+  /* 레벨 업 = 빨간 도장 */
+  .toast {
+    position: fixed; left: 50%; top: 40%; z-index: 9; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 22px 6px; background: var(--paper);
+    border: 4px solid var(--red); border-radius: 10px; color: var(--red);
+    font: 400 50px/1 var(--pen); white-space: nowrap;
+    box-shadow: 0 10px 30px rgba(70,50,20,.25);
+    animation: toast 1.5s var(--ease-out) both;
+  }
+  .toast small { font: 700 18px/1.3 var(--hand); }
+  @keyframes toast {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.8) rotate(-14deg); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-8deg); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-8deg); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(.95) rotate(-8deg); }
+  }
+
+  /* ---------- 모드 선택 ---------- */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0 0; }
+  .mode-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+    padding: 12px 14px 10px; cursor: pointer;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: var(--wobble);
+    box-shadow: 3px 4px 0 var(--ink); color: var(--ink);
+    transition: transform .08s, box-shadow .08s, background .15s;
+  }
+  .mode-card:nth-child(even) { border-radius: 16px 225px 14px 255px / 225px 14px 255px 16px; }
+  .mode-card:hover { background: var(--hl); }
+  .mode-card:active { transform: translate(2px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .mode-card:focus-visible { outline: 2px dashed var(--red); outline-offset: 4px; }
+  .mode-card b { font: 400 34px/1 var(--pen); }
+  .mode-card.hard b { color: var(--red); }
+  .mode-card span { font: 400 16px/1.25 var(--hand); color: var(--ink-soft); }
+  .mode-card small { font: 700 15px/1 var(--hand); color: var(--red); margin-top: 2px; }
+  .mode-card.wide { grid-column: 1 / -1; }
+  .section-note { margin: 18px 0 0; font-size: 17px; color: var(--ink-soft); }
+  .back { align-self: flex-start; margin: 10px 0 0 -8px; font: 700 18px/1 var(--hand); color: var(--ink-soft); background: none; border: 0; padding: 4px 8px; cursor: pointer; border-radius: 6px; }
+  .back:hover { background: var(--hl-blue); color: var(--ink); }
+
+  /* ---------- 15초 모드 ---------- */
+  .qhud { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 2px 0; }
+  .qclock { font-size: 20px; color: var(--ink-soft); }
+  .qclock b { font: 400 54px/1 var(--pen); color: var(--ink); font-variant-numeric: tabular-nums; display: inline-block; min-width: 2.6ch; }
+  .qclock.low b { color: var(--red); }
+  .qscore { font-size: 20px; color: var(--ink-soft); }
+  .qscore b { display: inline-block; font: 400 54px/1 var(--pen); color: var(--red); font-variant-numeric: tabular-nums; }
+  /* 연필로 그은 남은 시간 줄 */
+  .tbar { height: 10px; margin: 4px 0 0; border-bottom: 2px dashed var(--ink-faint); }
+  .tbar i { display: block; height: 7px; width: 100%; border-radius: 4px; background: repeating-linear-gradient(-55deg, var(--ink) 0 2px, transparent 2px 4px); opacity: .7; }
+  .tbar.low i { background: repeating-linear-gradient(-55deg, var(--red) 0 2px, transparent 2px 4px); }
+
+  .cue { position: relative; display: flex; flex-direction: column; align-items: center; margin: 14px 0 0; padding: 6px 0 4px; }
+  .cue .who { font-size: 18px; }
+  .cue .hand { width: 128px; height: 128px; transition: transform .3s var(--pop); }
+  .cue .hand.next { animation: reveal .3s var(--pop); }
+  .ask { margin-top: 2px; font: 700 21px/1.2 var(--hand); }
+  .ask mark { background: linear-gradient(transparent 55%, var(--hl) 55% 92%, transparent 92%); color: inherit; padding: 0 3px; }
+  /* 리버스: 상대 패가 뒤집히고 빨간 도장이 찍힘 */
+  .cue { border: 2.5px dashed transparent; border-radius: 14px; transition: background .2s, border-color .2s; }
+  .cue.rev { background: rgba(222,62,46,.08); border-color: var(--red); }
+  .cue.rev .hand { transform: rotate(180deg); }
+  .cue.rev .ask { color: var(--red); }
+  .cue.rev .ask mark { background: linear-gradient(transparent 55%, #FFC9C2 55% 92%, transparent 92%); }
+  .rev-stamp {
+    position: absolute; top: 18px; right: 6px; display: none;
+    font: 400 30px/1 var(--pen); color: var(--red); letter-spacing: .04em;
+    padding: 4px 10px 1px; border: 3px solid var(--red); border-radius: 6px; transform: rotate(12deg);
+  }
+  .cue.rev .rev-stamp { display: block; animation: stamp .3s var(--pop); }
+
+  .fb { min-height: 46px; margin: 4px 0 0; text-align: center; font: 400 38px/1.1 var(--pen); }
+  .fb .win { color: var(--red); }
+  .fb .draw { color: var(--ink); }
+  .fb .miss { color: var(--ink-soft); }
+  .fb span { display: inline-block; animation: stamp .3s var(--pop) both; }
+  .picks.locked .pick { background: #EEEAE0; color: var(--ink-faint); border-color: var(--ink-faint); box-shadow: 3px 4px 0 var(--ink-faint); }
+  .picks.locked .pick span { opacity: .4; }
+  .picks.shake { animation: wiggle .32s; }
+  @keyframes wiggle { 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+
+  @media (max-width: 400px) {
+    .page { padding: 16px 14px 20px 40px; }
+    .page { background:
+      linear-gradient(90deg, transparent 29px, var(--margin) 29px 31px, transparent 31px),
+      repeating-linear-gradient(180deg, transparent 0 31px, var(--rule) 31px 32px) 0 14px,
+      var(--paper); }
+    .page::before { left: 8px; }
+    .cell .mk { width: 22px; height: 22px; }
+    .cell .pt { font-size: 11px; }
+    .hand { width: 100px; height: 100px; }
+    .pick span { width: 52px; height: 52px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<!-- 볼펜 선을 살짝 떨리게 만드는 필터 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="3.2"/></filter>
+</svg>
+
+<main class="page">
+  <header class="pg-head">
+    <a class="home" href="../index.html">← 홈</a>
+    <span class="mode" id="modeTag">모드 선택</span>
+  </header>
+  <section id="stage" aria-live="polite"></section>
+</main>
+
+<script src="../shared.js"></script>
+<script>
+const ROUNDS = 10;
+const GAME = GAMES.find(g => g.id === 'rps');
+const stage = document.getElementById('stage');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 점수는 소수 둘째 자리까지라 1/100점 단위 정수로 계산 (부동소수 오차 방지)
+const pts = n => (n / 100).toFixed(2);
+
+// ---------- 손그림 ----------
+const DOODLE = {
+  // 가위: 손잡이 두 개 + 날 두 개
+  scissors: `<svg class="doodle rough" viewBox="0 0 100 100">
+    <path class="fl" fill="#E9EEF5" d="M41 63 L60 11 Q64 12 63 18 L48 65 Z"/>
+    <path class="fl" fill="#E9EEF5" d="M59 63 L40 11 Q36 12 37 18 L52 65 Z"/>
+    <ellipse class="fl" fill="#F47C6B" cx="33" cy="76" rx="14" ry="11" transform="rotate(-18 33 76)"/>
+    <ellipse class="fl" fill="#F47C6B" cx="67" cy="76" rx="14" ry="11" transform="rotate(18 67 76)"/>
+    <ellipse fill="#FFFEF7" cx="33" cy="76" rx="6.5" ry="4.5" transform="rotate(-18 33 76)"/>
+    <ellipse fill="#FFFEF7" cx="67" cy="76" rx="6.5" ry="4.5" transform="rotate(18 67 76)"/>
+    <circle fill="#27314F" cx="50" cy="41" r="3.6"/></svg>`,
+  // 바위: 울퉁불퉁한 돌 + 금
+  rock: `<svg class="doodle rough" viewBox="0 0 100 100">
+    <path class="fl" fill="#C9C2B5" d="M16 70 Q12 50 28 38 Q36 20 58 24 Q80 26 86 48 Q92 68 76 78 Q56 88 34 84 Q18 81 16 70 Z"/>
+    <path class="ln" d="M40 40 Q47 48 43 58 M64 50 L72 57 M30 66 Q36 64 38 70"/>
+    <path class="ln" stroke-width="2.4" d="M58 32 Q70 33 75 42" opacity=".5"/></svg>`,
+  // 보: 귀퉁이 접힌 종이
+  paper: `<svg class="doodle rough" viewBox="0 0 100 100">
+    <g transform="rotate(-6 50 50)">
+      <path class="fl" fill="#FFFFFF" d="M22 12 H64 L80 28 V88 H22 Z"/>
+      <path class="ln" d="M64 12 V28 H80"/>
+      <path class="ln" stroke="#9AB8DA" d="M30 42 H72 M30 54 H72 M30 66 H62"/>
+    </g></svg>`,
+};
+const HANDS = [
+  { id: 'scissors', name: '가위', key: '1' },
+  { id: 'rock',     name: '바위', key: '2' },
+  { id: 'paper',    name: '보',   key: '3' },
+];
+// 빨간 펜 채점 표시: 승 = 동그라미, 무 = 세모, 패 = X
+const MARK = {
+  win:  '<path pathLength="1" d="M52 12 C80 10 92 34 87 54 C82 78 56 92 33 85 C11 78 7 50 18 30 C27 15 45 10 62 15"/>',
+  draw: '<path pathLength="1" d="M50 14 L87 82 L12 80 L54 10"/>',
+  lose: '<path pathLength="1" d="M20 18 L82 84 M82 18 L18 82"/>',
+};
+const markSVG = (res, anim) => `<svg class="mk ${anim ? 'draw-in' : ''}" viewBox="0 0 100 100">${MARK[res]}</svg>`;
+
+// ---------- 레벨 (계산·저장은 shared.js) ----------
+function lvHTML(s, id, label, small = false) {
+  const need = needExp(s.lv);
+  return `<div class="lv ${small ? 'small' : ''}" id="${id}" data-label="${label}">
+    <span class="lv-badge">Lv.${s.lv}</span>
+    <div class="lv-main">
+      <div class="lv-bar"><i class="lv-fill" style="width:${s.exp / need * 100}%"></i></div>
+      <span class="lv-num">${label} · ${fmt(s.exp)} / ${fmt(need)} EXP</span>
+    </div>
+  </div>`;
+}
+function lvBlock() {
+  return lvHTML(loadLv(GAME.lvKey), 'lv-game', GAME.title) + lvHTML(loadLv(), 'lv-all', '전체', true);
+}
+
+// 경험치 바를 이전 상태 → 새 상태로 채움 (레벨업 시 한 칸씩 꽉 채우고 넘어감)
+async function playExp(id, from, to) {
+  const el = stage.querySelector('#' + id);
+  if (!el) return;
+  const badge = el.querySelector('.lv-badge'), fill = el.querySelector('.lv-fill'), num = el.querySelector('.lv-num');
+  const label = el.dataset.label;
+  await sleep(800);
+  for (let lv = from.lv; lv < to.lv; lv++) {
+    if (!el.isConnected) return;
+    fill.style.width = '100%';
+    num.textContent = `${label} · ${fmt(needExp(lv))} / ${fmt(needExp(lv))} EXP`;
+    await sleep(750);
+    if (!el.isConnected) return;
+    badge.textContent = `Lv.${lv + 1}`;
+    badge.classList.remove('up'); void badge.offsetWidth; badge.classList.add('up');
+    fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = '';
+  }
+  if (!el.isConnected) return;
+  fill.style.width = (to.exp / needExp(to.lv) * 100) + '%';
+  num.textContent = `${label} · ${fmt(to.exp)} / ${fmt(needExp(to.lv))} EXP`;
+}
+
+async function playAllExp({ all, game }) {
+  await Promise.all([playExp('lv-game', game.from, game.to), playExp('lv-all', all.from, all.to)]);
+  if (!stage.querySelector('#lv-game')) return;
+  // 둘 다 오르면 전체 레벨 업을 우선 보여줌
+  if (all.to.lv > all.from.lv) toast('레벨 업!', `전체 Lv.${all.to.lv} 달성`);
+  else if (game.to.lv > game.from.lv) toast('레벨 업!', `${GAME.title} Lv.${game.to.lv} 달성`);
+}
+
+function toast(big, small) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.setAttribute('role', 'status');
+  t.innerHTML = `${big}<small>${small}</small>`;
+  document.body.appendChild(t);
+  t.addEventListener('animationend', () => t.remove());
+}
+
+// ---------- 모드 ----------
+// classic: 10판 운 게임 (점수는 1/100점 단위, EXP = 점수 × 25, 소수점 버림)
+// 나머지: 15초 동안 상대 패를 보고 맞히기 (EXP = 득점 × expRate)
+// shuffle: 문제마다 선택지 순서 섞기 / reverse: 리버스 문제가 나올 확률
+const QUICK_LIMIT = 15;
+const LOCK_MS = 1000; // 틀렸을 때 조작 불가 시간
+const MODES = {
+  classic: { label: '일반',   kind: 'classic', best: GAME.bests['일반'],   blurb: '10판 승부 · 운에 맡겨요' },
+  easy:    { label: 'Easy',   kind: 'quick',   best: GAME.bests.Easy,     blurb: '15초 · 선택지 순서 고정', expRate: 50, shuffle: false, reverse: 0 },
+  normal:  { label: 'Normal', kind: 'quick',   best: GAME.bests.Normal,   blurb: '15초 · 선택지 순서가 섞여요', expRate: 100, shuffle: true, reverse: 0 },
+  hard:    { label: 'Hard',   kind: 'quick',   best: GAME.bests.Hard,     blurb: '15초 · 순서 섞임 + 리버스!', expRate: 150, shuffle: true, reverse: .3 },
+};
+let modeId = 'classic';
+let M = MODES.classic;
+const modeTag = document.getElementById('modeTag');
+
+// 가위(0) → 바위(1) → 보(2): 바로 다음 것이 이김
+const beats = h => (h + 1) % 3;
+const losesTo = h => (h + 2) % 3;
+const showRecord = (b, kind) => kind === 'classic' ? `${b.toFixed(2)}점` : `${b}점`;
+
+// ---------- 게임 흐름 ----------
+let keyOff = null;
+
+function scene(html) {
+  if (keyOff) { keyOff(); keyOff = null; }
+  stage.innerHTML = `<div class="scene">${html}</div>`;
+  return stage.firstChild;
+}
+
+function onKeys(fn) {
+  const h = e => { if (!e.repeat) fn(e); };
+  window.addEventListener('keydown', h);
+  keyOff = () => window.removeEventListener('keydown', h);
+}
+
+function intro() {
+  modeTag.textContent = '모드 선택';
+  scene(`
+    <h1 class="title"><mark>가위바위보</mark></h1>
+    <p class="sub">모드를 골라 주세요.</p>
+    <div class="trio">${HANDS.map(h => `<span>${DOODLE[h.id]}</span>`).join('')}</div>
+    <div class="modes">${Object.entries(MODES).map(([id, m]) => {
+      const b = loadRecord(m.best);
+      return `<button class="mode-card ${id}" data-mode="${id}">
+        <b>${m.label}</b><span>${m.blurb}</span>
+        <small>${b !== null ? '최고 ' + showRecord(b, m.kind) : '&nbsp;'}</small></button>`;
+    }).join('')}</div>
+    <div class="spacer"></div>
+    ${lvBlock()}`);
+  stage.querySelectorAll('.mode-card').forEach(b => b.addEventListener('click', () => modeIntro(b.dataset.mode)));
+  stage.querySelector('.mode-card').focus();
+}
+
+function modeIntro(id) {
+  modeId = id; M = MODES[id];
+  modeTag.textContent = `${M.label} 모드`;
+  const best = loadRecord(M.best);
+  const rules = M.kind === 'classic' ? `
+      <li><b>10판</b> 동안 가위·바위·보 중 하나를 내요</li>
+      <li><b>승리 3점</b> · 무승부 1점 · 패배 0점</li>
+      <li><b>연승 보너스</b> +0.02 × 연승 <small>(지거나 비기면 0)</small></li>
+      <li><b>무패 보너스</b> +0.01 × 무패 <small>(지면 0)</small></li>
+      <li>얻는 EXP = <span class="red">최종 점수 × 25</span> <small>(소수점 버림)</small></li>` : `
+      <li><b>15초</b> 동안 상대 패를 보고 골라요</li>
+      <li><b>이기는 패 +1점</b> · 비기는 패 0점</li>
+      <li><b>지는 패</b>를 고르면 <span class="red">-1점, 1초 동안 못 골라요</span></li>
+      <li>선택지 순서: ${M.shuffle ? '<b>문제마다 섞여요</b>' : '가위 · 바위 · 보 고정'}</li>
+      ${M.reverse ? '<li><span class="red">리버스</span>가 뜨면 반대로! <b>지는 패가 +1점</b>, 이기는 패는 -1점</li>' : ''}
+      <li>얻는 EXP = <span class="red">득점 × ${M.expRate}</span> <small>(0점 이하는 EXP·기록 없음)</small></li>`;
+  scene(`
+    <button class="back" id="back">← 모드 선택</button>
+    <h1 class="title"><mark>${M.label}</mark> 모드</h1>
+    <ul class="rules">${rules}</ul>
+    <div class="spacer"></div>
+    ${lvBlock()}
+    <div class="btn-row" style="margin-top:16px"><button class="pen-btn" id="go">시작하기 ✎</button></div>
+    <p class="best-line">${best !== null ? `최고 점수 ${showRecord(best, M.kind)}` : '아직 기록이 없어요'}</p>`);
+  stage.querySelector('#back').addEventListener('click', intro);
+  const go = stage.querySelector('#go');
+  go.addEventListener('click', start);
+  go.focus();
+}
+
+function start() {
+  if (M.kind === 'classic') startClassic(); else startQuick();
+}
+
+// 결과 화면 공통: 최고 기록 저장 + EXP 지급 + 레벨 바
+function resultTail(gain, calc) {
+  const before = { game: loadLv(GAME.lvKey), all: loadLv() };
+  const change = giveExp(GAME.lvKey, gain);
+  return {
+    change,
+    html: `
+    <div class="exp-gain"><mark>+${fmt(gain)} EXP</mark></div>
+    <p class="exp-calc">${calc}</p>
+    ${lvHTML(before.game, 'lv-game', GAME.title)}${lvHTML(before.all, 'lv-all', '전체', true)}
+    <div class="spacer"></div>
+    <div class="btn-row">
+      <button class="pen-btn" id="again">한 번 더 ✎</button>
+      <button class="pen-btn ghost" id="modes">모드 선택</button>
+    </div>`,
+  };
+}
+
+function bindResult(change) {
+  const again = stage.querySelector('#again');
+  const modes = stage.querySelector('#modes');
+  again.addEventListener('click', start);
+  modes.addEventListener('click', intro);
+  // 연타하던 키로 바로 재시작되지 않도록 잠깐 막음
+  again.disabled = modes.disabled = true;
+  setTimeout(() => { again.disabled = modes.disabled = false; again.focus(); }, 700);
+  playAllExp(change);
+}
+
+// 최고 기록이면 저장하고 true
+function saveIfBest(score, text) {
+  const best = loadRecord(M.best);
+  const isBest = score > 0 && (best === null || score > best);
+  if (isBest) { try { localStorage.setItem(M.best, text); } catch {} }
+  return { best, isBest };
+}
+
+// ========== 일반 모드: 10판 ==========
+let round, streak, combo, total, log, busy;
+
+function sheetHTML() {
+  return `<div class="sheet" id="sheet">${Array.from({ length: ROUNDS }, (_, i) => {
+    const r = log[i];
+    return `<div class="cell ${i === round && round < ROUNDS ? 'now' : ''}">
+      <span class="no">${i + 1}</span>
+      ${r ? markSVG(r.res, false) : '<svg class="mk" viewBox="0 0 100 100"></svg>'}
+      <span class="pt">${r ? pts(r.pts) : ''}</span></div>`;
+  }).join('')}</div>`;
+}
+
+function startClassic() {
+  round = 0; streak = 0; combo = 0; total = 0; log = []; busy = false;
+  const s = scene(`
+    ${sheetHTML()}
+    <div class="tally">
+      <span>연승 <b id="streak">0</b></span>
+      <span>무패 <b id="combo">0</b></span>
+      <span class="total">합계 <b id="total">0.00</b>점</span>
+    </div>
+    <div class="arena">
+      <div class="side"><span class="who">상대</span><div class="hand cpu-q" id="cpu">?</div></div>
+      <div class="vs">vs</div>
+      <div class="side"><span class="who">나</span><div class="hand" id="me"></div></div>
+    </div>
+    <div class="verdict" id="verdict"><span class="big">1판, 골라 보세요!</span></div>
+    <div class="spacer"></div>
+    <div class="picks">${HANDS.map((h, i) => `
+      <button class="pick" data-i="${i}" aria-label="${h.name}"><span>${DOODLE[h.id]}</span>${h.name}<kbd>${h.key}</kbd></button>`).join('')}
+    </div>`);
+  s.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => play(+b.dataset.i)));
+  onKeys(e => { const i = HANDS.findIndex(h => h.key === e.key); if (i >= 0) play(i); });
+}
+
+async function play(me) {
+  if (busy || round >= ROUNDS) return;
+  busy = true;
+  const cpuEl = stage.querySelector('#cpu'), meEl = stage.querySelector('#me');
+  const verdict = stage.querySelector('#verdict');
+  const picks = stage.querySelectorAll('.pick');
+  picks.forEach((b, i) => { b.disabled = true; b.classList.toggle('chosen', i === me); });
+
+  // 가위, 바위, 보! — 두 손이 흔들린 뒤 공개
+  meEl.className = 'hand shake'; meEl.innerHTML = DOODLE[HANDS[me].id];
+  cpuEl.className = 'hand cpu-q shake'; cpuEl.textContent = '?';
+  verdict.innerHTML = '<span class="big">가위, 바위, 보!</span>';
+  await sleep(500);
+  if (!cpuEl.isConnected) return;
+
+  const cpu = Math.floor(Math.random() * 3);
+  cpuEl.className = 'hand reveal'; cpuEl.innerHTML = DOODLE[HANDS[cpu].id];
+  const res = me === beats(cpu) ? 'win' : me === cpu ? 'draw' : 'lose';
+
+  let p = 0, calc;
+  if (res === 'win') {
+    streak++; combo++;
+    p = 300 + 2 * streak + combo;
+    calc = `3 + 연승 0.02×${streak} + 무패 0.01×${combo}`;
+  } else if (res === 'draw') {
+    streak = 0; combo++;
+    p = 100 + combo;
+    calc = `1 + 무패 0.01×${combo}`;
+  } else {
+    streak = 0; combo = 0;
+    calc = '연승·무패 모두 0으로';
+  }
+  total += p;
+  log.push({ res, pts: p });
+  if (res === 'win') cpuEl.classList.add('lost');
+  if (res === 'lose') meEl.classList.add('lost');
+
+  const word = { win: '이겼다!', draw: '비겼다', lose: '졌다…' }[res];
+  verdict.innerHTML = `<span class="big ${res} stamp">${word} +${pts(p)}</span><span class="calc">${calc}</span>`;
+
+  const cell = stage.querySelectorAll('.cell')[round];
+  cell.querySelector('.mk').outerHTML = markSVG(res, true);
+  cell.querySelector('.pt').textContent = pts(p);
+  round++;
+  stage.querySelectorAll('.cell').forEach((c, i) => c.classList.toggle('now', i === round && round < ROUNDS));
+  setTally('streak', streak); setTally('combo', combo); setTally('total', pts(total));
+
+  if (round >= ROUNDS) {
+    await sleep(1300);
+    if (cpuEl.isConnected) finishClassic();
+    return;
+  }
+  await sleep(350);
+  if (!cpuEl.isConnected) return;
+  picks.forEach(b => { b.disabled = false; b.classList.remove('chosen'); });
+  busy = false;
+}
+
+function setTally(id, v) {
+  const el = stage.querySelector('#' + id);
+  if (el.textContent === String(v)) return;
+  el.textContent = v;
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+}
+
+function finishClassic() {
+  const count = r => log.filter(l => l.res === r).length;
+  const { best, isBest } = saveIfBest(total / 100, pts(total));
+  // 점수 × 25 = (1/100점 단위) ÷ 4, 소수점은 버림
+  const tail = resultTail(Math.floor(total / 4), `최종 점수 ${pts(total)} × 25`);
+  scene(`
+    ${sheetHTML()}
+    <div class="final">
+      <div class="lbl">최종 점수</div>
+      <div class="score">${pts(total)}<small>점</small></div>
+      <p class="wdl">승 <b>${count('win')}</b> · 무 <b>${count('draw')}</b> · 패 <b>${count('lose')}</b></p>
+      ${isBest ? '<span class="new-best">최고 기록!</span>' : best !== null ? `<p class="best-line" style="margin:0">최고 점수 ${best.toFixed(2)}점</p>` : ''}
+    </div>
+    ${tail.html}`);
+  bindResult(tail.change);
+}
+
+// ========== Easy / Normal / Hard: 15초 맞히기 ==========
+let q, score, hits, draws, misses, lockUntil, qStart, qRaf, qOver;
+
+function startQuick() {
+  score = 0; hits = 0; draws = 0; misses = 0; lockUntil = 0; qOver = false;
+  scene(`
+    <div class="qhud">
+      <span class="qclock" id="qclock"><b id="qtime">15.00</b>초</span>
+      <span class="qscore">점수 <b id="qscore">0</b></span>
+    </div>
+    <div class="tbar" id="tbar"><i id="tfill"></i></div>
+    <div class="cue" id="cue">
+      <span class="who">상대가 낸 패</span>
+      <div class="hand" id="cpu"></div>
+      <div class="ask" id="ask"></div>
+      <span class="rev-stamp">리버스!</span>
+    </div>
+    <div class="fb" id="fb"></div>
+    <div class="spacer"></div>
+    <div class="picks" id="picks"></div>`);
+  onKeys(e => { const i = ['1', '2', '3'].indexOf(e.key); if (i >= 0) answer(i); });
+  nextQ();
+  qStart = performance.now();
+  qRaf = requestAnimationFrame(qTick);
+}
+
+function nextQ() {
+  const cpu = Math.floor(Math.random() * 3);
+  const order = [0, 1, 2];
+  if (M.shuffle) {
+    for (let i = 2; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  }
+  q = { cpu, order, rev: Math.random() < M.reverse };
+
+  const cue = stage.querySelector('#cue');
+  const cpuEl = stage.querySelector('#cpu');
+  cue.classList.toggle('rev', q.rev);
+  cpuEl.innerHTML = DOODLE[HANDS[cpu].id];
+  cpuEl.classList.remove('next'); void cpuEl.offsetWidth; cpuEl.classList.add('next');
+  stage.querySelector('#ask').innerHTML = q.rev ? '반대로! <mark>지는 패</mark>를 골라요' : '<mark>이기는 패</mark>를 골라요';
+
+  const picks = stage.querySelector('#picks');
+  picks.innerHTML = order.map((h, pos) => `
+    <button class="pick" data-pos="${pos}" aria-label="${HANDS[h].name}"><span>${DOODLE[HANDS[h].id]}</span>${HANDS[h].name}<kbd>${pos + 1}</kbd></button>`).join('');
+  picks.querySelectorAll('.pick').forEach(b => b.addEventListener('pointerdown', () => answer(+b.dataset.pos)));
+}
+
+function answer(pos) {
+  if (qOver || performance.now() < lockUntil) return;
+  const me = q.order[pos];
+  const good = q.rev ? losesTo(q.cpu) : beats(q.cpu);
+  const fb = stage.querySelector('#fb');
+  if (me === good) {
+    score += 1; hits++;
+    fb.innerHTML = '<span class="win">+1</span>';
+  } else if (me === q.cpu) {
+    draws++;
+    fb.innerHTML = '<span class="draw">0 비김</span>';
+  } else {
+    // 틀림 → -1점 + 1초 조작 불가, 문제는 그대로 (마구 누르기 방지)
+    score -= 1; misses++;
+    lockUntil = performance.now() + LOCK_MS;
+    fb.innerHTML = '<span class="miss">땡! -1 · 1초 멈춤</span>';
+    setTally('qscore', score);
+    const picks = stage.querySelector('#picks');
+    picks.classList.remove('shake'); void picks.offsetWidth;
+    picks.classList.add('shake', 'locked');
+    setTimeout(() => { if (picks.isConnected) picks.classList.remove('locked'); }, LOCK_MS);
+    return;
+  }
+  setTally('qscore', score);
+  nextQ();
+}
+
+function qTick(now) {
+  const left = Math.max(0, QUICK_LIMIT - (now - qStart) / 1000);
+  const timeEl = stage.querySelector('#qtime');
+  if (!timeEl) return;
+  timeEl.textContent = left.toFixed(2);
+  stage.querySelector('#tfill').style.width = (left / QUICK_LIMIT * 100) + '%';
+  stage.querySelector('#qclock').classList.toggle('low', left < 5);
+  stage.querySelector('#tbar').classList.toggle('low', left < 5);
+  if (left <= 0) {
+    qOver = true;
+    stage.querySelector('#fb').innerHTML = '<span class="win">그만!</span>';
+    stage.querySelector('#picks').classList.add('locked');
+    setTimeout(() => { if (stage.querySelector('#qtime')) finishQuick(); }, 800);
+    return;
+  }
+  qRaf = requestAnimationFrame(qTick);
+}
+
+function finishQuick() {
+  const { best, isBest } = saveIfBest(score, String(score));
+  // 득점이 0 이하면 EXP 없음 (음수 EXP로 레벨이 깎이지 않도록)
+  const tail = score > 0
+    ? resultTail(score * M.expRate, `득점 ${score} × ${M.expRate}`)
+    : resultTail(0, '득점이 0점 이하라 EXP가 없어요');
+  scene(`
+    <div class="final">
+      <div class="lbl">${M.label} 모드 · 15초 득점</div>
+      <div class="score">${score}<small>점</small></div>
+      <p class="wdl">이김 <b>${hits}</b> · 비김 <b>${draws}</b> · 실수 <b>${misses}</b></p>
+      ${isBest ? '<span class="new-best">최고 기록!</span>' : best !== null ? `<p class="best-line" style="margin:0">최고 점수 ${best}점</p>` : ''}
+    </div>
+    ${tail.html}`);
+  bindResult(tail.change);
+}
+
+intro();
+</script>
+</body>
+</html>

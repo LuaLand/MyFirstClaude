@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>벽돌깨기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  /* 밤의 오락실 — 짙은 남색 화면 + 사탕색 벽돌 + 빛나는 공 */
+  :root {
+    --night: #15132B;   --night-2: #1E1B3D;  --grid: rgba(255,255,255,.04);
+    --frame: #0B0A1A;   --line: #3A3566;
+    --ink: #F4F2FF;     --ink-soft: #A9A4CF; --ink-faint: #6E6899;
+    --heart: #FF4D6D;   --heart-off: #3A3566;
+    --paddle: #5CE1FF;  --ball: #FFFFFF;
+    --b1: #FF5C7A; --b2: #FFA53D; --b3: #FFE14D; --b4: #4ADE9B;
+    --cap: "Black Han Sans", "Pretendard Variable", system-ui, sans-serif;
+    --body: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: grid; place-items: center;
+    padding: 20px 16px;
+    font-family: var(--body); color: var(--ink);
+    background: radial-gradient(120% 80% at 50% 0%, #2A2560, var(--night) 60%);
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cab { width: 100%; max-width: 420px; }
+  .top { display: flex; align-items: center; justify-content: space-between; height: 36px; }
+  .home {
+    font: 700 15px/1 var(--body); color: var(--ink-soft); text-decoration: none;
+    padding: 8px 12px; margin-left: -10px; border-radius: 99px;
+  }
+  .home:hover { color: var(--ink); background: rgba(255,255,255,.08); }
+  .home:focus-visible { outline: 2px solid var(--paddle); outline-offset: 2px; }
+  .title { font: 400 22px/1 var(--cap); letter-spacing: .02em; }
+
+  /* ---------- 점수 · 남은 공 ---------- */
+  .hud {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 10px 0 0; padding: 10px 14px;
+    background: var(--frame); border: 2px solid var(--line); border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+  }
+  .score { display: flex; align-items: baseline; gap: 10px; }
+  .score .lbl { font: 800 12px/1 var(--body); letter-spacing: .14em; color: var(--ink-soft); }
+  .score b { display: inline-block; font: 400 30px/1 var(--cap); font-variant-numeric: tabular-nums; color: var(--b3); min-width: 3ch; }
+  .score b.bump { animation: bump .25s ease-out; }
+  @keyframes bump { 40% { transform: scale(1.25); } }
+  .score small { font-size: 12px; color: var(--ink-faint); }
+  .lives { display: flex; gap: 6px; }
+  .lives svg { width: 24px; height: 24px; display: block; }
+  .lives .on path { fill: var(--heart); filter: drop-shadow(0 0 6px rgba(255,77,109,.55)); }
+  .lives .off path { fill: var(--heart-off); }
+  .lives .lost svg { animation: heart-lost .6s ease-out; }
+  @keyframes heart-lost { 0% { transform: scale(1.5); } 30% { transform: scale(.7) rotate(-12deg); } 100% { transform: none; } }
+  .timer { font: 400 26px/1 var(--cap); font-variant-numeric: tabular-nums; min-width: 3.4ch; text-align: center; }
+  .timer.low { color: var(--heart); }
+  .mode-tag { min-width: 52px; text-align: right; font: 800 12px/1 var(--body); letter-spacing: .08em; color: var(--ink-soft); }
+
+  /* 스피드 단계 (화면 왼쪽 위) + SPEED UP! 알림 */
+  .speed {
+    position: absolute; left: 3%; top: 1.6%; z-index: 2; pointer-events: none;
+    font: 800 11px/1 var(--body); letter-spacing: .06em; color: var(--ink-faint);
+    padding: 4px 8px; border-radius: 99px; border: 1px solid var(--line);
+  }
+  .speed.up { animation: speed-up .6s ease-out; color: var(--paddle); border-color: var(--paddle); }
+  .speed.max { color: var(--heart); border-color: var(--heart); }
+  @keyframes speed-up { 30% { transform: scale(1.3); } }
+  .flash {
+    position: absolute; left: 0; right: 0; top: 46%; z-index: 2; text-align: center; pointer-events: none;
+    font: 400 30px/1 var(--cap); color: var(--paddle); text-shadow: 0 0 16px rgba(92,225,255,.6);
+    animation: flash .9s ease-out forwards;
+  }
+  @keyframes flash { 0% { opacity: 0; transform: scale(1.4); } 20% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+
+  /* ---------- 게임 화면 (논리 좌표 100 × 150, 화면에는 % 로 배치) ---------- */
+  .stage { position: relative; }
+  .field {
+    position: relative; aspect-ratio: 2 / 3; overflow: hidden;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 6.25%,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 8.333% 100%,
+      linear-gradient(180deg, var(--night-2), var(--night));
+    border: 2px solid var(--line); border-radius: 0 0 16px 16px;
+    box-shadow: 0 20px 40px rgba(5,4,20,.5);
+    cursor: pointer; touch-action: none; /* 누르고 있는 동안 화면이 스크롤되지 않도록 */
+  }
+  /* 누르고 있는 쪽을 살짝 밝혀 줌 */
+  .field::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 50%; pointer-events: none;
+    opacity: 0; transition: opacity .15s;
+  }
+  .field.go-left::after { left: 0; opacity: 1; background: linear-gradient(90deg, rgba(92,225,255,.10), transparent); }
+  .field.go-right::after { right: 0; opacity: 1; background: linear-gradient(270deg, rgba(92,225,255,.10), transparent); }
+  /* 미스: 화면이 붉게 번쩍 */
+  .field.missed { animation: miss-flash .7s ease-out; }
+  @keyframes miss-flash { 0%, 30% { box-shadow: inset 0 0 0 999px rgba(255,77,109,.22), 0 20px 40px rgba(5,4,20,.5); } }
+
+  .brick {
+    position: absolute; border-radius: 5px;
+    background: linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0) 45%), var(--c);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.22), 0 0 10px color-mix(in srgb, var(--c) 45%, transparent);
+    transition: opacity .2s, transform .2s;
+  }
+  .brick.r1 { --c: var(--b1); }
+  .brick.r2 { --c: var(--b2); }
+  .brick.r3 { --c: var(--b3); }
+  .brick.r4 { --c: var(--b4); }
+  .brick.gone { opacity: 0; transform: scale(1.35); }
+
+  .ball {
+    position: absolute; left: 50%; top: 0; width: 4.4%; aspect-ratio: 1;
+    transform: translateX(-50%); border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #DCE8FF 60%, #A9C2FF);
+    box-shadow: 0 0 12px rgba(180,210,255,.9);
+  }
+  .ball.hidden { opacity: 0; }
+  .paddle {
+    position: absolute; left: 50%; bottom: 13%; width: 26%; height: 3.2%;
+    transform: translateX(-50%); border-radius: 99px;
+    background: linear-gradient(180deg, #CFF6FF, var(--paddle) 55%, #2BA6D6);
+    box-shadow: 0 0 16px rgba(92,225,255,.6), inset 0 -2px 0 rgba(0,0,0,.2);
+  }
+  .paddle.bump { animation: paddle-bump .16s ease-out; }
+  @keyframes paddle-bump { 50% { transform: translateX(-50%) translateY(12%) scaleY(.8); } }
+
+  /* 가시 바닥: 공이 닿으면 미스 */
+  .spikes { position: absolute; left: 0; right: 0; bottom: 0; height: 6%; }
+  .spikes svg { display: block; width: 100%; height: 100%; }
+  .spikes::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 22px;
+    background: linear-gradient(0deg, rgba(255,77,109,.18), transparent);
+    pointer-events: none;
+  }
+
+  /* 발사 안내 */
+  .prompt {
+    position: absolute; left: 0; right: 0; top: 60%; text-align: center; pointer-events: none;
+    font: 800 15px/1.4 var(--body); color: var(--ink-soft);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .prompt.hidden { display: none; }
+  .prompt b { color: var(--paddle); }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  /* ---------- 결과 (클리어 / 게임 오버) ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 5; display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    background: rgba(11,10,26,.74); border-radius: 0 0 16px 16px;
+  }
+  .overlay.show { display: flex; animation: fade-in .3s ease-out; }
+  @keyframes fade-in { from { opacity: 0; } }
+  .card { width: 100%; max-width: 300px; text-align: center; animation: card-in .45s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes card-in { from { transform: translateY(16px) scale(.92); opacity: 0; } }
+  .card h2 { margin: 0; font: 400 46px/1 var(--cap); letter-spacing: .02em; }
+  .card.clear h2 { color: var(--b3); text-shadow: 0 0 18px rgba(255,225,77,.5); }
+  .card.over h2 { color: var(--heart); text-shadow: 0 0 18px rgba(255,77,109,.5); }
+  .card .sub { margin: 8px 0 0; font-size: 14px; color: var(--ink-soft); }
+  .card .big { margin: 16px 0 0; font: 400 56px/1 var(--cap); font-variant-numeric: tabular-nums; }
+  .card .big small { font: 700 16px/1 var(--body); color: var(--ink-soft); margin-left: 4px; }
+  .card .best { display: inline-block; margin: 8px 0 0; padding: 4px 10px; border-radius: 99px; font: 800 12px/1.2 var(--body); background: var(--b3); color: var(--night); }
+  .card .best.plain { background: none; color: var(--ink-faint); font-weight: 600; }
+  .card .exp { margin: 14px 0 0; font: 800 18px/1 var(--body); color: var(--paddle); }
+  .card .lv { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .card .lv b { color: var(--b3); }
+  /* 점수 계산표 */
+  .calc { width: 100%; margin: 14px 0 0; border-collapse: collapse; font-size: 13px; color: var(--ink-soft); }
+  .calc td { padding: 3px 0; text-align: left; }
+  .calc td:last-child { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .calc tr.total td { border-top: 1px solid var(--line); padding-top: 8px; font-weight: 800; color: var(--ink); }
+  /* 난이도 선택 */
+  .modes { display: grid; gap: 10px; margin: 18px 0 0; }
+  .mode-btn {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left;
+    padding: 13px 16px; border-radius: 14px; cursor: pointer; font-family: var(--body); color: var(--ink);
+    background: rgba(255,255,255,.04); border: 2px solid var(--line);
+    transition: border-color .15s, background .15s;
+  }
+  .mode-btn:hover, .mode-btn:focus-visible { outline: none; border-color: var(--paddle); background: rgba(92,225,255,.06); }
+  .mode-btn b { font: 400 24px/1 var(--cap); }
+  .mode-btn.easy b { color: var(--b4); }
+  .mode-btn.normal b { color: var(--b2); }
+  .mode-btn.hard b { color: var(--heart); }
+  .mode-btn span { display: block; margin-top: 5px; font-size: 12px; color: var(--ink-soft); }
+  .mode-btn small { flex: none; font: 800 12px/1 var(--body); color: var(--b3); }
+  .btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px 0 0; }
+  .btn {
+    padding: 12px 20px; border-radius: 99px; cursor: pointer;
+    font: 800 15px/1 var(--body); color: var(--night); background: var(--paddle); border: 0;
+    box-shadow: 0 0 16px rgba(92,225,255,.4);
+  }
+  .btn.ghost { color: var(--ink); background: transparent; border: 2px solid var(--line); box-shadow: none; text-decoration: none; }
+  .btn:focus-visible { outline: 2px solid var(--b3); outline-offset: 3px; }
+  .btn:active { transform: scale(.96); }
+
+  .hint { margin: 12px 0 0; text-align: center; font-size: 13px; line-height: 1.6; color: var(--ink-faint); }
+  .hint kbd {
+    font: 700 11px/1 var(--body); padding: 3px 6px; border-radius: 5px;
+    color: var(--ink-soft); border: 1px solid var(--line); border-bottom-width: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main class="cab">
+  <header class="top">
+    <a class="home" href="../index.html">← 홈</a>
+    <span class="title">벽돌깨기</span>
+    <span class="mode-tag" id="modeTag"></span>
+  </header>
+
+  <div class="hud">
+    <div class="score"><span class="lbl">SCORE</span><b id="score">0</b></div>
+    <b class="timer" id="timer" aria-label="남은 시간">60.0</b>
+    <div class="lives" id="lives" aria-label="남은 공 3개"></div>
+  </div>
+
+  <div class="stage">
+    <div class="field" id="field">
+      <span class="speed" id="speed">SPEED 50</span>
+      <div id="bricks"></div>
+      <div class="ball" id="ball"></div>
+      <div class="paddle" id="paddle"></div>
+      <div class="spikes" aria-hidden="true">
+        <svg viewBox="0 0 120 10" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="spk" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FF4D6D"/><stop offset=".32" stop-color="#FF4D6D"/><stop offset=".42" stop-color="#E6E8F2"/>
+              <stop offset="1" stop-color="#6E7290"/>
+            </linearGradient>
+            <pattern id="spkp" width="6" height="10" patternUnits="userSpaceOnUse">
+              <path d="M0 10 L3 0 L6 10 Z" fill="url(#spk)"/>
+              <path d="M3 0 L6 10 L3 10 Z" fill="#000" opacity=".18"/>
+            </pattern>
+          </defs>
+          <rect width="120" height="10" fill="url(#spkp)"/>
+        </svg>
+      </div>
+      <p class="prompt" id="prompt"><b>Space</b> 또는 화면을 눌러 발사!</p>
+    </div>
+    <div class="overlay" id="overlay" role="dialog" aria-live="assertive"></div>
+  </div>
+
+  <p class="hint"><kbd>←</kbd> <kbd>→</kbd> 또는 화면 왼쪽·오른쪽을 누르고 있으면 패들 이동 · <kbd>Space</kbd> 발사</p>
+</main>
+
+<script src="../shared.js"></script>
+<script>
+const GAME = GAMES.find(g => g.id === 'brick');
+
+// ---------- 규칙 ----------
+const TIME_LIMIT = 60;       // 초
+const BRICK_PTS = 10;        // 벽돌 1개
+const TIME_BONUS = 10;       // (클리어) 남은 시간 1초당
+const LIFE_BONUS = 100;      // (클리어 · 타임 오버) 남은 공 1개당
+const MAX_LIVES = 3;
+const SPEED_EVERY = 4;       // 벽돌 4개 깰 때마다 스피드 업
+const PADDLE_STEP = .2;      // 패들 속도 +0.2 (공은 난이도별 step)
+const SPEED_MAX_STACK = 5;   // 최대 5번
+
+// 난이도: speed = 공의 처음 속도 배율 / step = 스피드 업 1번에 오르는 공 속도 / layout = 벽돌 배치('#' = 벽돌, 줄마다 6칸) / expRate = EXP 배율
+// 배치는 모두 24개, 가장 아래 줄도 패들과 충분히 떨어지도록 최대 6줄
+const MODES = {
+  easy: {
+    label: 'Easy', speed: 1.25, step: .075, expRate: 2, desc: '공 속도 50~65 · 반듯한 4줄',
+    layout: [
+      '######',
+      '######',
+      '######',
+      '######',
+    ],
+  },
+  normal: {
+    label: 'Normal', speed: 1.5, step: .1, expRate: 4, desc: '공 속도 60~80 · 빈틈 있는 5줄',
+    layout: [
+      '######',
+      '.####.',
+      '######',
+      '.####.',
+      '##..##',
+    ],
+  },
+  hard: {
+    label: 'Hard', speed: 1.5, step: .2, expRate: 6, desc: '공 속도 60~100 · 구멍 숭숭 6줄',
+    layout: [
+      '##..##',
+      '.####.',
+      '#.##.#',
+      '##..##',
+      '.####.',
+      '#.##.#',
+    ],
+  },
+};
+
+// ---------- 좌표 (가로 100 × 세로 150 의 논리 좌표, 화면 비율 2:3 과 같음) ----------
+const W = 100, H = 150;
+const pctY = y => y / H * 100;
+const PADDLE_W = 26;                         // .paddle width: 26%
+const PADDLE_H = H * .032;                   // .paddle height: 3.2%
+const PADDLE_TOP = H * (1 - .13) - PADDLE_H; // .paddle bottom: 13%
+const R = W * .044 / 2;                      // 공 반지름 (.ball width: 4.4%)
+const SPIKE_TOP = H * (1 - .06);             // 가시 바닥 윗선 (.spikes height: 6%)
+const PADDLE_BASE = 80;                      // 속도 1.0 일 때 패들: 1초에 화면 너비의 80%
+const BALL_BASE = 85;                        // 속도 1.0 일 때 공: 1초에 85
+const MAX_BOUNCE = 60 * Math.PI / 180;       // 패들 끝에 맞으면 최대 60° 로 튕김
+// 벽돌 칸: 양옆 여백 4, 칸 사이 1.8 / 줄 사이 2.2, 가로:세로 = 5:2
+const COLS = 6;
+const BRICK_LEFT = 4, BRICK_TOP = 10.5, GAP_X = 1.8, GAP_Y = 2.2;
+const BRICK_W = (W - BRICK_LEFT * 2 - GAP_X * (COLS - 1)) / COLS;
+const BRICK_H = BRICK_W * .4;
+
+const field = document.getElementById('field');
+const paddleEl = document.getElementById('paddle');
+const ballEl = document.getElementById('ball');
+const promptEl = document.getElementById('prompt');
+const overlay = document.getElementById('overlay');
+const timerEl = document.getElementById('timer');
+const speedEl = document.getElementById('speed');
+
+// mode: select(난이도 선택) → ready(공이 패들 위) → play(날아다님) → miss(잠깐 멈춤) → ready …
+//       끝: clear(모두 파괴) · over(남은 공 0) · timeup(시간 0)
+let M = MODES.easy, modeId = 'easy';
+let mode = 'select', score, lives, bricks, broken, stack, paddleX, ball, timeLeft, clockOn;
+
+const ballSpeed = () => BALL_BASE * (M.speed + stack * M.step);
+const paddleSpeed = () => PADDLE_BASE * (1 + stack * PADDLE_STEP);
+const bestKey = id => GAME.bests[MODES[id].label];
+
+// ---------- 그리기 ----------
+const HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.6 4.5c2.2 0 3.6 1.2 5.4 3.2 1.8-2 3.2-3.2 5.4-3.2 3.7 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21z"/></svg>';
+
+function buildBricks() {
+  bricks = [];
+  M.layout.forEach((line, r) => [...line].forEach((ch, c) => {
+    if (ch === '#') bricks.push({ x: BRICK_LEFT + c * (BRICK_W + GAP_X), y: BRICK_TOP + r * (BRICK_H + GAP_Y), w: BRICK_W, h: BRICK_H, row: r, alive: true });
+  }));
+  const box = document.getElementById('bricks');
+  box.innerHTML = bricks.map(b =>
+    `<span class="brick r${b.row % 4 + 1}" style="left:${b.x}%;top:${pctY(b.y)}%;width:${b.w}%;height:${pctY(b.h)}%"></span>`).join('');
+  [...box.children].forEach((el, i) => { bricks[i].el = el; });
+}
+
+function renderHud(lostIndex = -1) {
+  const s = document.getElementById('score');
+  if (s.textContent !== String(score)) {
+    s.textContent = score;
+    s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump');
+  }
+  const el = document.getElementById('lives');
+  el.innerHTML = Array.from({ length: MAX_LIVES }, (_, i) =>
+    `<span class="${i < lives ? 'on' : 'off'} ${i === lostIndex ? 'lost' : ''}">${HEART}</span>`).join('');
+  el.setAttribute('aria-label', `남은 공 ${lives}개`);
+}
+
+function renderTimer() {
+  timerEl.textContent = timeLeft.toFixed(1);
+  timerEl.classList.toggle('low', timeLeft <= 10);
+}
+
+function renderSpeed() {
+  // 화면 표시는 속도 1.0배 = 40 기준 (예: 1.25배 → SPEED 50)
+  speedEl.textContent = `SPEED ${+((M.speed + stack * M.step) * 40).toFixed(1)}${stack >= SPEED_MAX_STACK ? " MAX" : ""}`;
+  speedEl.classList.toggle('max', stack >= SPEED_MAX_STACK);
+}
+
+function draw() {
+  paddleEl.style.left = paddleX + '%';
+  ballEl.style.left = ball.x + '%';
+  ballEl.style.top = pctY(ball.y - R) + '%';
+}
+
+function retrigger(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+function flash(text) {
+  field.querySelectorAll('.flash').forEach(f => f.remove());
+  const f = document.createElement('div');
+  f.className = 'flash';
+  f.textContent = text;
+  field.appendChild(f);
+  f.addEventListener('animationend', () => f.remove());
+}
+
+// ---------- 난이도 선택 ----------
+function showSelect() {
+  mode = 'select';
+  promptEl.classList.add('hidden');
+  document.getElementById('modeTag').textContent = '';
+  overlay.innerHTML = `
+    <div class="card">
+      <h2 style="color:var(--paddle)">난이도</h2>
+      <p class="sub">제한 시간 ${TIME_LIMIT}초 · 벽돌 24개</p>
+      <div class="modes">${Object.entries(MODES).map(([id, m]) => {
+        const b = loadRecord(bestKey(id));
+        return `<button class="mode-btn ${id}" data-mode="${id}">
+          <div><b>${m.label}</b><span>${m.desc} · EXP ×${m.expRate}</span></div>
+          <small>${b !== null ? `최고 ${b}` : ''}</small></button>`;
+      }).join('')}</div>
+    </div>`;
+  overlay.classList.add('show');
+  overlay.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => newGame(b.dataset.mode)));
+  overlay.querySelector('.mode-btn').focus();
+}
+
+// ---------- 게임 흐름 ----------
+function newGame(id = modeId) {
+  modeId = id; M = MODES[id];
+  document.getElementById('modeTag').textContent = M.label.toUpperCase();
+  score = 0; lives = MAX_LIVES; broken = 0; stack = 0; paddleX = 50;
+  timeLeft = TIME_LIMIT; clockOn = false;
+  ball = { x: 50, y: PADDLE_TOP - R, vx: 0, vy: 0 };
+  buildBricks();
+  overlay.classList.remove('show');
+  overlay.innerHTML = '';
+  renderHud(); renderTimer(); renderSpeed();
+  ready();
+}
+
+// 공을 패들 위에 올려 두고 발사를 기다림
+function ready() {
+  mode = 'ready';
+  ballEl.classList.remove('hidden');
+  promptEl.classList.remove('hidden');
+}
+
+function launch() {
+  if (mode !== 'ready') return;
+  // 거의 수직으로, 좌우 ±20° 안에서 살짝 무작위
+  const a = (Math.random() * 2 - 1) * 20 * Math.PI / 180;
+  ball.vx = ballSpeed() * Math.sin(a);
+  ball.vy = -ballSpeed() * Math.cos(a);
+  mode = 'play';
+  clockOn = true; // 제한 시간은 첫 발사부터 흐름 (미스 뒤 대기 중에도 계속)
+  promptEl.classList.add('hidden');
+}
+
+function miss() {
+  mode = 'miss';
+  lives--;
+  renderHud(lives);
+  ballEl.classList.add('hidden');
+  retrigger(field, 'missed');
+  if (lives <= 0) { clockOn = false; setTimeout(() => finish('over'), 900); }
+  else setTimeout(() => { if (mode === 'miss') ready(); }, 1000);
+}
+
+// 벽돌 4개마다 공 속도 +step · 패들 +0.2 (최대 5번). 날아가는 공도 방향은 그대로 빨라짐
+function speedUp() {
+  if (stack >= SPEED_MAX_STACK || broken % SPEED_EVERY) return;
+  stack++;
+  const k = ballSpeed() / Math.hypot(ball.vx, ball.vy);
+  ball.vx *= k; ball.vy *= k;
+  renderSpeed();
+  retrigger(speedEl, 'up');
+  flash(stack >= SPEED_MAX_STACK ? 'SPEED MAX!' : 'SPEED UP!');
+}
+
+// ---------- 공 움직임 + 충돌 ----------
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function moveBall(dt) {
+  // 빠르게 움직여도 벽돌을 뚫고 지나가지 않도록 한 번에 0.8 이하씩 나눠서 이동
+  const steps = Math.max(1, Math.ceil(ballSpeed() * dt / .8));
+  const h = dt / steps;
+  for (let k = 0; k < steps && mode === 'play'; k++) {
+    const px = ball.x, py = ball.y;
+    ball.x += ball.vx * h;
+    ball.y += ball.vy * h;
+
+    // 왼쪽 · 오른쪽 · 위 벽
+    if (ball.x < R) { ball.x = R; ball.vx = Math.abs(ball.vx); }
+    if (ball.x > W - R) { ball.x = W - R; ball.vx = -Math.abs(ball.vx); }
+    if (ball.y < R) { ball.y = R; ball.vy = Math.abs(ball.vy); }
+
+    // 패들: 위에서 내려와 패들 윗면을 지날 때만. 맞은 위치가 끝일수록 비스듬히 튕김
+    if (ball.vy > 0 && py + R <= PADDLE_TOP && ball.y + R >= PADDLE_TOP
+        && Math.abs(ball.x - paddleX) <= PADDLE_W / 2 + R * .6) {
+      const off = clamp((ball.x - paddleX) / (PADDLE_W / 2), -1, 1);
+      ball.vx = ballSpeed() * Math.sin(off * MAX_BOUNCE);
+      ball.vy = -ballSpeed() * Math.cos(off * MAX_BOUNCE);
+      ball.y = PADDLE_TOP - R;
+      retrigger(paddleEl, 'bump');
+    }
+
+    hitBrick(px, py);
+
+    if (mode === 'play' && ball.y + R >= SPIKE_TOP) miss();
+  }
+}
+
+// 공(원)과 벽돌(사각형)이 겹치면 튕기고 벽돌 파괴 (한 번에 1개)
+function hitBrick(px, py) {
+  for (const b of bricks) {
+    if (!b.alive) continue;
+    const cx = clamp(ball.x, b.x, b.x + b.w), cy = clamp(ball.y, b.y, b.y + b.h);
+    const dx = ball.x - cx, dy = ball.y - cy;
+    if (dx * dx + dy * dy > R * R) continue;
+
+    // 직전 위치로 어느 면에 맞았는지 판단: 옆에서 왔으면 좌우 반전, 위·아래에서 왔으면 상하 반전
+    const fromSide = px < b.x || px > b.x + b.w;
+    const fromTopBottom = py < b.y || py > b.y + b.h;
+    const sideDir = px < b.x + b.w / 2 ? -1 : 1;  // 벽돌 왼쪽에서 왔으면 왼쪽으로
+    const vertDir = py < b.y + b.h / 2 ? -1 : 1;  // 벽돌 위쪽에서 왔으면 위로
+    if (fromSide && !fromTopBottom) ball.vx = sideDir * Math.abs(ball.vx);
+    else if (!fromSide) ball.vy = vertDir * Math.abs(ball.vy);
+    else { ball.vx = sideDir * Math.abs(ball.vx); ball.vy = vertDir * Math.abs(ball.vy); } // 모서리
+
+    b.alive = false;
+    b.el.classList.add('gone');
+    broken++;
+    score += BRICK_PTS;
+    renderHud();
+    if (broken === bricks.length) {
+      mode = 'clear';
+      clockOn = false;
+      setTimeout(() => finish('clear'), 600);
+    } else speedUp();
+    return;
+  }
+}
+
+// ---------- 결과 ----------
+function finish(kind) {
+  mode = kind;
+  // 보너스: 클리어 → 남은 시간 + 남은 공 / 타임 오버 → 남은 공 / 게임 오버 → 없음
+  const secLeft = Math.max(0, timeLeft);
+  const timePts = kind === 'clear' ? Math.floor(secLeft * TIME_BONUS) : 0;
+  const lifePts = kind === 'over' ? 0 : lives * LIFE_BONUS;
+  const brickPts = broken * BRICK_PTS;
+  score = brickPts + timePts + lifePts;
+  renderHud();
+
+  const key = bestKey(modeId);
+  const best = loadRecord(key);
+  const isBest = score > 0 && (best === null || score > best);
+  if (isBest) { try { localStorage.setItem(key, String(score)); } catch {} }
+
+  const gain = score * M.expRate;
+  const { all, game } = giveExp(GAME.lvKey, gain);
+  const up = all.to.lv > all.from.lv || game.to.lv > game.from.lv;
+
+  const title = { clear: 'CLEAR!', over: 'GAME OVER', timeup: 'TIME UP' }[kind];
+  const sub = {
+    clear: `벽돌을 모두 깼어요! ${secLeft.toFixed(1)}초 남김`,
+    over: '공을 모두 잃었어요',
+    timeup: `시간 종료! 벽돌 ${broken} / ${bricks.length}개`,
+  }[kind];
+  const row = (label, v) => `<tr><td>${label}</td><td>${fmt(v)}</td></tr>`;
+  overlay.innerHTML = `
+    <div class="card ${kind === 'clear' ? 'clear' : 'over'}">
+      <h2>${title}</h2>
+      <p class="sub">${M.label} · ${sub}</p>
+      <div class="big">${fmt(score)}<small>점</small></div>
+      ${isBest ? '<span class="best">최고 기록!</span>' : best !== null ? `<span class="best plain">최고 ${fmt(best)}점</span>` : ''}
+      <table class="calc">
+        ${row(`벽돌 ${broken}개 × ${BRICK_PTS}`, brickPts)}
+        ${kind === 'clear' ? row(`남은 시간 ${secLeft.toFixed(1)}초 × ${TIME_BONUS}`, timePts) : ''}
+        ${kind !== 'over' ? row(`남은 공 ${lives}개 × ${LIFE_BONUS}`, lifePts) : ''}
+        <tr class="total"><td>합계</td><td>${fmt(score)}</td></tr>
+      </table>
+      <p class="exp">+${fmt(gain)} EXP <small style="color:var(--ink-faint);font-weight:600">(× ${M.expRate})</small></p>
+      <p class="lv">${up ? '<b>레벨 업!</b> · ' : ''}${GAME.title} Lv.${game.to.lv} · 전체 Lv.${all.to.lv}</p>
+      <div class="btns">
+        <button class="btn" id="again">다시 하기</button>
+        <button class="btn ghost" id="pick">난이도 선택</button>
+        <a class="btn ghost" href="../index.html">홈으로</a>
+      </div>
+    </div>`;
+  overlay.classList.add('show');
+  const again = overlay.querySelector('#again');
+  const pick = overlay.querySelector('#pick');
+  again.addEventListener('click', () => newGame());
+  pick.addEventListener('click', showSelect);
+  // 연타하던 Space로 바로 재시작되지 않도록 잠깐 뒤에 포커스
+  again.disabled = pick.disabled = true;
+  setTimeout(() => { again.disabled = pick.disabled = false; again.focus(); }, 600);
+}
+
+// ---------- 입력 ----------
+// 패들: 누르고 있는 동안 일정한 속도로 미끄러지고, 떼면 바로 멈춤
+const held = { ArrowLeft: false, ArrowRight: false }; // 키보드
+const pointers = new Map();                             // 누르고 있는 손가락·마우스 → -1(왼쪽) / 1(오른쪽)
+
+// 지금 가야 할 방향: -1 왼쪽, 1 오른쪽, 0 멈춤 (양쪽을 같이 누르면 상쇄)
+function moveDir() {
+  let d = (held.ArrowRight ? 1 : 0) - (held.ArrowLeft ? 1 : 0);
+  for (const v of pointers.values()) d += v;
+  return Math.sign(d);
+}
+
+window.addEventListener('keydown', e => {
+  if (e.key in held) { e.preventDefault(); held[e.key] = true; return; }
+  if ((e.key === ' ' || e.key === 'ArrowUp') && (mode === 'ready' || mode === 'play')) {
+    e.preventDefault();
+    if (!e.repeat) launch();
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.key in held) held[e.key] = false;
+});
+
+// 화면 왼쪽 절반을 누르면 왼쪽, 오른쪽 절반이면 오른쪽 (누른 채 반대편으로 끌면 방향도 바뀜)
+function sideOf(e) {
+  const r = field.getBoundingClientRect();
+  return e.clientX < r.left + r.width / 2 ? -1 : 1;
+}
+field.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  try { field.setPointerCapture(e.pointerId); } catch {} // 화면 밖으로 끌고 나가도 뗄 때까지 추적
+  pointers.set(e.pointerId, sideOf(e));
+  launch(); // 발사 대기 중이면 화면을 누르는 것으로도 발사
+});
+field.addEventListener('pointermove', e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, sideOf(e));
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type =>
+  field.addEventListener(type, e => pointers.delete(e.pointerId)));
+
+// 다른 창으로 가면 누르던 키·손가락을 모두 뗀 것으로 처리 (계속 굴러가지 않도록)
+window.addEventListener('blur', () => { held.ArrowLeft = held.ArrowRight = false; pointers.clear(); });
+
+// ---------- 메인 루프 ----------
+const ENDED = ['select', 'clear', 'over', 'timeup'];
+let lastT = performance.now();
+function loop(t) {
+  const dt = Math.min(.033, Math.max(0, (t - lastT) / 1000)); // 탭이 멈췄다 돌아와도 순간이동하지 않도록
+  lastT = t;
+
+  if (clockOn) {
+    timeLeft = Math.max(0, timeLeft - dt);
+    renderTimer();
+    if (timeLeft <= 0) {
+      clockOn = false;
+      mode = 'timeup';
+      ballEl.classList.add('hidden');
+      flash('TIME UP!');
+      setTimeout(() => finish('timeup'), 900);
+    }
+  }
+
+  const dir = ENDED.includes(mode) ? 0 : moveDir();
+  if (dir) paddleX = clamp(paddleX + dir * paddleSpeed() * dt, PADDLE_W / 2, W - PADDLE_W / 2);
+  field.classList.toggle('go-left', dir < 0);
+  field.classList.toggle('go-right', dir > 0);
+
+  if (mode === 'ready') { ball.x = paddleX; ball.y = PADDLE_TOP - R; }
+  else if (mode === 'play') moveBall(dt);
+
+  if (ball) draw();
+  requestAnimationFrame(loop);
+}
+
+// 처음엔 Easy 판을 뒤에 깔아 두고 난이도 선택 창을 띄움
+newGame('easy');
+showSelect();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

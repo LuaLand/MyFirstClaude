@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>두더지 잡기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  /* 잔디밭 — 하늘 + 줄무늬 잔디 + 흙구멍 + 동글동글 두더지 */
+  :root {
+    --sky: #BDE6FA;     --sky-2: #E4F6FF;
+    --grass: #7CC653;   --grass-2: #6DB847;  --grass-d: #4E8F33;
+    --dirt: #A8754C;    --dirt-d: #7A5233;   --pit: #3A2418;
+    --cream: #FFFBEF;   --cream-d: #F1E8CF;
+    --ink: #3D2B1F;     --ink-soft: #7A6655; --ink-faint: #B0A08E;
+    --sun: #FFD84D;     --red: #E5533D;      --pink: #F49A8B;
+    --font: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --ease-out: cubic-bezier(.16, 1, .3, 1);
+    --pop: cubic-bezier(.34, 1.56, .64, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: grid; place-items: center;
+    padding: 24px 16px;
+    font-family: var(--font); color: var(--ink);
+    background:
+      radial-gradient(circle at 85% 8%, var(--sun) 0 34px, rgba(255,216,77,.35) 35px 52px, transparent 53px),
+      linear-gradient(180deg, var(--sky-2), var(--sky) 55%, #CDEFB5 55.1%, #B5E28F);
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+
+  /* ---------- 카드 ---------- */
+  .page {
+    position: relative; width: 100%; max-width: 440px;
+    padding: 16px 18px 22px;
+    background: var(--cream);
+    border: 3px solid var(--ink); border-radius: 28px;
+    box-shadow: 0 6px 0 var(--ink), 0 22px 40px rgba(40,70,30,.25);
+  }
+  .pg-head { display: flex; align-items: center; justify-content: space-between; height: 32px; }
+  .home {
+    font: 18px/1 var(--font); color: var(--ink-soft); text-decoration: none;
+    padding: 6px 10px; margin-left: -6px; border-radius: 99px;
+  }
+  .home:hover { color: var(--ink); background: var(--cream-d); }
+  .home:focus-visible { outline: 3px solid var(--grass-d); outline-offset: 2px; }
+  .mode {
+    font: 15px/1 var(--font); padding: 6px 12px 5px; border-radius: 99px;
+    background: var(--grass); color: #fff; border: 2.5px solid var(--ink);
+  }
+
+  #stage { min-height: 580px; display: flex; flex-direction: column; }
+  .scene { flex: 1; display: flex; flex-direction: column; animation: rise .4s var(--ease-out) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+  h1.title { margin: 12px 0 0; font: 52px/1.05 var(--font); letter-spacing: -.01em; }
+  h1.title em { font-style: normal; color: var(--grass-d); }
+  .sub { margin: 6px 0 0; font-size: 18px; color: var(--ink-soft); }
+
+  .rules { list-style: none; margin: 14px 0 0; padding: 0; font-size: 18px; line-height: 1.45; display: grid; gap: 8px; }
+  .rules li { position: relative; padding-left: 26px; }
+  .rules li::before {
+    content: ""; position: absolute; left: 4px; top: .42em; width: 12px; height: 9px;
+    border-radius: 50%; background: var(--dirt); box-shadow: inset 0 3px 0 var(--pit);
+  }
+  .rules b { color: var(--grass-d); }
+  .rules .red { color: var(--red); }
+  .rules small { font-size: 15px; color: var(--ink-soft); }
+  @media (pointer: coarse) { .rules .keys-only { display: none; } }
+
+  /* ---------- 버튼 ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 23px/1 var(--font); color: #fff; padding: 15px 30px 13px; cursor: pointer;
+    background: var(--grass); border: 3px solid var(--ink); border-radius: 99px;
+    box-shadow: 0 5px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .btn:focus-visible, .mode-card:focus-visible { outline: 3px solid var(--sun); outline-offset: 4px; }
+  .btn.ghost { background: var(--cream); color: var(--ink); }
+  .btn:disabled { filter: none; cursor: default; }
+  .btn-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .spacer { flex: 1; min-height: 14px; }
+  .best-line { margin: 12px 0 0; text-align: center; font-size: 16px; color: var(--ink-soft); }
+  .back { align-self: flex-start; margin: 8px 0 0 -8px; font: 17px/1 var(--font); color: var(--ink-soft); background: none; border: 0; padding: 6px 10px; cursor: pointer; border-radius: 99px; }
+  .back:hover { background: var(--cream-d); color: var(--ink); }
+
+  /* ---------- 두더지 그림 ---------- */
+  .mole-svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .mole-svg .bonk, .mole-svg .crown { display: none; }
+  /* 황금 두더지 = 털색만 바꾸고 왕관 */
+  .hole.special .fur { fill: #E3A92F; }
+  .hole.special .shine { stroke: #F8D981; }
+  .hole.special .mole-svg .crown { display: inline; }
+  .hole.special.up .mole { filter: drop-shadow(0 0 6px rgba(255,216,77,.95)); }
+  /* 폭탄(함정) 심지 불꽃 */
+  .mole-svg .spark { animation: flicker .24s steps(2) infinite; transform-origin: 84px 11px; }
+  @keyframes flicker { 50% { transform: scale(.65); } }
+  .hole.bonk .mole-svg .face, .peek.bonk .mole-svg .face { display: none; }
+  .hole.bonk .mole-svg .bonk { display: inline; }
+
+  /* 소개 화면: 구멍에서 빼꼼 */
+  .peek { position: relative; width: 150px; height: 130px; margin: 14px auto 0; }
+  .peek .mound { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; border-radius: 50%; background: var(--grass-2); }
+  .peek .pit { position: absolute; left: 22px; right: 22px; bottom: 12px; height: 34px; border-radius: 50%; background: var(--pit); box-shadow: 0 0 0 6px var(--dirt); }
+  .peek .clip { position: absolute; left: 32px; right: 32px; bottom: 29px; height: 130px; overflow: hidden; }
+  .peek .mole { position: absolute; left: 0; right: 0; bottom: 0; animation: peek 2.6s var(--ease-out) infinite; }
+  @keyframes peek { 0%, 12% { transform: translateY(100%); } 30%, 72% { transform: translateY(6%); } 90%, 100% { transform: translateY(100%); } }
+
+  /* ---------- 모드 선택 ---------- */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 0; }
+  .mode-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+    padding: 14px 16px 12px; cursor: pointer; font-family: var(--font); color: var(--ink);
+    background: #fff; border: 3px solid var(--ink); border-radius: 20px;
+    box-shadow: 0 5px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s, background .15s;
+  }
+  .mode-card.wide { grid-column: 1 / -1; }
+  .mode-card:hover { background: #F2FBE9; }
+  .mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .mode-card b { font: 30px/1 var(--font); color: var(--grass-d); font-weight: 400; }
+  .mode-card span { font-size: 15px; color: var(--ink-soft); }
+  .mode-card small { font-size: 14px; color: var(--red); margin-top: 2px; }
+  .mode-card.hard b { color: var(--red); }
+
+  /* ---------- 플레이 HUD ---------- */
+  .hud { display: flex; align-items: baseline; justify-content: space-between; margin: 8px 2px 0; }
+  .clock, .pts { font-size: 18px; color: var(--ink-soft); }
+  .clock b, .pts b { display: inline-block; font: 48px/1 var(--font); font-variant-numeric: tabular-nums; }
+  .clock b { color: var(--ink); min-width: 2.7ch; }
+  .clock.low b { color: var(--red); }
+  .pts b { color: var(--grass-d); }
+  .pts .bump { animation: bump .35s var(--pop); }
+  @keyframes bump { 40% { transform: scale(1.35) rotate(-5deg); } }
+  .tbar { height: 12px; margin: 6px 0 0; border: 2.5px solid var(--ink); border-radius: 99px; overflow: hidden; background: #fff; }
+  .tbar i { display: block; height: 100%; width: 100%; background: var(--grass); border-radius: 99px; }
+  .tbar.low i { background: var(--red); }
+
+  /* ---------- 잔디밭 ---------- */
+  .field {
+    position: relative; margin: 14px 0 0; padding: 26px 12px 10px;
+    border: 3px solid var(--ink); border-radius: 26px;
+    background: repeating-linear-gradient(90deg, var(--grass) 0 28px, var(--grass-2) 28px 56px);
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,.08), 0 5px 0 var(--ink);
+    cursor: pointer; touch-action: manipulation;
+  }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 10px; transition: filter .15s; }
+  .hole { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; color: inherit; }
+  .hole:focus-visible { outline: none; }
+  .hole .mound { position: absolute; left: 2%; right: 2%; bottom: 6%; height: 40%; border-radius: 50%; background: rgba(60,110,35,.35); }
+  .hole .pit {
+    position: absolute; left: 10%; right: 10%; bottom: 14%; height: 30%; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 35%, #1F120B, var(--pit) 70%);
+    box-shadow: 0 0 0 5px var(--dirt), 0 4px 0 5px var(--dirt-d);
+  }
+  /* 구멍 가운데 선 위로만 두더지가 보이도록 잘라냄 */
+  .hole .clip { position: absolute; left: 15%; right: 15%; bottom: 29%; top: -26%; overflow: hidden; pointer-events: none; }
+  .hole .mole { position: absolute; left: 0; right: 0; bottom: 0; transform: translateY(102%); transition: transform .14s ease-in; }
+  .hole.up .mole { transform: translateY(0); transition: transform .16s var(--pop); }
+  .hole.bonk .mole { animation: squash .2s ease-out; }
+  @keyframes squash { 40% { transform: translateY(8%) scale(1.12, .86); } }
+  .hole kbd {
+    position: absolute; right: 2%; bottom: 0; z-index: 2;
+    font: 12px/1 var(--font); color: rgba(255,255,255,.85); background: rgba(40,70,25,.45);
+    padding: 3px 6px 2px; border-radius: 6px;
+  }
+  @media (pointer: coarse) { .hole kbd { display: none; } }
+
+  /* 잡았을 때 튀어 오르는 글자 */
+  .pop {
+    position: absolute; left: 50%; top: -18%; z-index: 3; pointer-events: none;
+    font: 30px/1 var(--font); color: #fff; white-space: nowrap;
+    -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill;
+    text-shadow: 0 3px 0 var(--ink);
+    animation: pop .6s var(--ease-out) forwards;
+  }
+  .pop.hit { color: var(--sun); }
+  .pop.gold { color: var(--sun); font-size: 36px; }
+  .pop.minus { color: var(--red); font-size: 36px; }
+  /* 폭탄을 눌렀을 때 펑 */
+  .boom {
+    position: absolute; left: 50%; top: 35%; z-index: 3; width: 130%; aspect-ratio: 1; pointer-events: none;
+    border-radius: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle, #FFF3B0 0 18%, #FFB13D 38%, rgba(229,83,61,.85) 52%, rgba(229,83,61,0) 70%);
+    animation: boom .45s ease-out forwards;
+  }
+  @keyframes boom { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } }
+  @keyframes pop {
+    0% { opacity: 0; transform: translate(-50%, 10px) scale(.6); }
+    25% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, -30px) scale(1); }
+  }
+
+  /* 헛방 = 잔디밭이 흔들리고 -5 */
+  .field.miss { animation: shake .3s; }
+  .field > .pop { top: 40%; }
+  @keyframes shake { 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+  .field.over { cursor: default; }
+
+  .msg { min-height: 40px; margin: 12px 0 0; text-align: center; font: 26px/1.2 var(--font); color: var(--ink-soft); }
+  .msg .end { color: var(--red); font-size: 34px; display: inline-block; animation: pop-in .3s var(--pop); }
+  @keyframes pop-in { from { transform: scale(1.6); opacity: 0; } }
+
+  /* ---------- 결과 ---------- */
+  .final { text-align: center; margin: 14px 0 0; }
+  .final .lbl { font-size: 18px; color: var(--ink-soft); }
+  .final .score { display: inline-block; margin-top: 4px; font: 92px/1 var(--font); color: var(--grass-d); font-variant-numeric: tabular-nums; animation: pop-in .4s var(--pop); }
+  .final .score small { font-size: 36px; color: var(--ink); }
+  .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; margin: 10px 0 0; }
+  .stats span { font-size: 15px; color: var(--ink-soft); padding: 6px 12px 5px; border-radius: 99px; background: var(--cream-d); }
+  .stats b { color: var(--ink); font-size: 18px; font-weight: 400; }
+  .new-best {
+    display: inline-block; margin-top: 10px; padding: 6px 14px 5px;
+    font: 18px/1 var(--font); color: var(--ink); background: var(--sun);
+    border: 2.5px solid var(--ink); border-radius: 99px; transform: rotate(-4deg);
+    animation: pop-in .45s var(--pop) .3s both;
+  }
+  .exp-gain { margin: 16px 0 0; text-align: center; font: 36px/1 var(--font); color: var(--ink); animation: pop-in .45s var(--pop) .45s both; }
+  .exp-gain mark { background: linear-gradient(transparent 55%, var(--sky) 55% 92%, transparent 92%); color: inherit; padding: 0 6px; }
+  .exp-calc { margin: 4px 0 8px; text-align: center; font-size: 15px; color: var(--ink-soft); }
+
+  /* ---------- 레벨 ---------- */
+  .lv { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; }
+  .lv-badge {
+    flex: none; min-width: 64px; text-align: center;
+    font: 19px/1 var(--font); padding: 6px 8px 5px;
+    border: 2.5px solid var(--ink); border-radius: 99px; background: #fff;
+  }
+  .lv-badge.up { animation: pop-in .5s var(--pop); background: var(--sun); }
+  .lv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .lv-bar { height: 14px; border: 2.5px solid var(--ink); border-radius: 99px; overflow: hidden; background: #fff; }
+  .lv-fill { display: block; height: 100%; background: var(--grass); border-radius: 99px; transition: width .7s var(--ease-out); }
+  .lv-num { font-size: 14px; line-height: 1; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .lv.small { margin-top: 6px; }
+  .lv.small .lv-badge { font-size: 15px; padding: 4px 8px 3px; border-style: dashed; }
+  .lv.small .lv-bar { height: 10px; border-width: 2px; }
+  .lv.small .lv-fill { background: var(--dirt); }
+
+  .toast {
+    position: fixed; left: 50%; top: 40%; z-index: 9; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 14px 26px 12px; background: var(--sun);
+    border: 4px solid var(--ink); border-radius: 24px; color: var(--ink);
+    font: 44px/1 var(--font); white-space: nowrap;
+    box-shadow: 0 6px 0 var(--ink), 0 16px 30px rgba(40,70,30,.3);
+    animation: toast 1.5s var(--ease-out) both;
+  }
+  .toast small { font-size: 17px; margin-top: 6px; }
+  @keyframes toast {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+    15%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(.95); }
+  }
+
+  @media (max-width: 400px) {
+    .page { padding: 14px 12px 18px; }
+    h1.title { font-size: 44px; }
+    .field { padding: 22px 8px 8px; }
+    .grid { gap: 14px 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="pg-head">
+    <a class="home" href="../index.html">← 홈</a>
+    <span class="mode" id="modeTag">모드 선택</span>
+  </header>
+  <section id="stage" aria-live="polite"></section>
+</main>
+
+<script src="../shared.js"></script>
+<script>
+const GAME = GAMES.find(g => g.id === 'mole');
+const stage = document.getElementById('stage');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- 그림 ----------
+// 두더지: 평소 얼굴 / 맞은 얼굴, 황금 두더지는 CSS로 털색(.fur)을 바꾸고 왕관(.crown)을 보임
+const MOLE = `<svg class="mole-svg" viewBox="0 0 100 110" aria-hidden="true">
+  <path class="fur" d="M13 112 V60 Q13 17 50 17 Q87 17 87 60 V112 Z" fill="#8A5A3B" stroke="#3D2B1F" stroke-width="3.5"/>
+  <path class="shine" d="M30 30 Q40 23 52 23" fill="none" stroke="#A9744F" stroke-width="5" stroke-linecap="round"/>
+  <path class="crown" d="M35 20 L37 5 L44 13 L50 2 L56 13 L63 5 L65 20 Z" fill="#FFD84D" stroke="#3D2B1F" stroke-width="2.6" stroke-linejoin="round"/>
+  <ellipse cx="50" cy="68" rx="25" ry="20" fill="#F3CFA6"/>
+  <ellipse cx="28" cy="63" rx="5.5" ry="3.4" fill="#F49A8B" opacity=".85"/>
+  <ellipse cx="72" cy="63" rx="5.5" ry="3.4" fill="#F49A8B" opacity=".85"/>
+  <g class="face">
+    <circle cx="37" cy="49" r="4.6" fill="#3D2B1F"/><circle cx="63" cy="49" r="4.6" fill="#3D2B1F"/>
+    <circle cx="38.6" cy="47.4" r="1.5" fill="#fff"/><circle cx="64.6" cy="47.4" r="1.5" fill="#fff"/>
+    <path d="M44 69 Q50 74 56 69" fill="none" stroke="#3D2B1F" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+  <g class="bonk" fill="none" stroke="#3D2B1F" stroke-width="3" stroke-linecap="round">
+    <path d="M32 45 l9 8 m0 -8 l-9 8 M58 45 l9 8 m0 -8 l-9 8"/>
+    <path d="M44 72 Q50 66 56 72"/>
+    <path d="M50 4 l2.4 5 5.4 .6 -4 3.7 1.1 5.3 -4.9 -2.7 -4.9 2.7 1.1 -5.3 -4 -3.7 5.4 -.6 Z" fill="#FFD84D" stroke-width="2"/>
+    <path d="M80 12 l1.6 3.3 3.6 .4 -2.7 2.5 .7 3.5 -3.2 -1.8 -3.2 1.8 .7 -3.5 -2.7 -2.5 3.6 -.4 Z" fill="#FFD84D" stroke-width="1.8"/>
+  </g>
+  <ellipse cx="50" cy="60" rx="7.5" ry="5.5" fill="#F07C8F" stroke="#3D2B1F" stroke-width="2.6"/>
+  <ellipse cx="29" cy="95" rx="10" ry="6.5" fill="#F3CFA6" stroke="#3D2B1F" stroke-width="2.6"/>
+  <ellipse cx="71" cy="95" rx="10" ry="6.5" fill="#F3CFA6" stroke="#3D2B1F" stroke-width="2.6"/>
+</svg>`;
+// 함정: 화난 폭탄
+const BOMB = `<svg class="mole-svg" viewBox="0 0 100 110" aria-hidden="true">
+  <path d="M60 32 Q68 16 82 12" fill="none" stroke="#7A5233" stroke-width="5" stroke-linecap="round"/>
+  <g class="spark"><circle cx="84" cy="11" r="7.5" fill="#FFD84D"/><circle cx="84" cy="11" r="3.5" fill="#E5533D"/></g>
+  <rect x="49" y="27" width="20" height="13" rx="3" fill="#55556A" stroke="#3D2B1F" stroke-width="3" transform="rotate(28 59 33)"/>
+  <circle cx="50" cy="72" r="36" fill="#2F2F3B" stroke="#3D2B1F" stroke-width="3.5"/>
+  <ellipse cx="35" cy="55" rx="10" ry="6" fill="#fff" opacity=".22" transform="rotate(-35 35 55)"/>
+  <path d="M31 62 l13 6 M69 62 l-13 6" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+  <circle cx="40" cy="74" r="4.2" fill="#fff"/><circle cx="60" cy="74" r="4.2" fill="#fff"/>
+  <path d="M41 90 Q50 84 59 90" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+</svg>`;
+
+// ---------- 레벨 (계산·저장은 shared.js) ----------
+function lvHTML(s, id, label, small = false) {
+  const need = needExp(s.lv);
+  return `<div class="lv ${small ? 'small' : ''}" id="${id}" data-label="${label}">
+    <span class="lv-badge">Lv.${s.lv}</span>
+    <div class="lv-main">
+      <div class="lv-bar"><i class="lv-fill" style="width:${s.exp / need * 100}%"></i></div>
+      <span class="lv-num">${label} · ${fmt(s.exp)} / ${fmt(need)} EXP</span>
+    </div>
+  </div>`;
+}
+function lvBlock() {
+  return lvHTML(loadLv(GAME.lvKey), 'lv-game', GAME.title) + lvHTML(loadLv(), 'lv-all', '전체', true);
+}
+
+// 경험치 바를 이전 상태 → 새 상태로 채움 (레벨업 시 한 칸씩 꽉 채우고 넘어감)
+async function playExp(id, from, to) {
+  const el = stage.querySelector('#' + id);
+  if (!el) return;
+  const badge = el.querySelector('.lv-badge'), fill = el.querySelector('.lv-fill'), num = el.querySelector('.lv-num');
+  const label = el.dataset.label;
+  await sleep(800);
+  for (let lv = from.lv; lv < to.lv; lv++) {
+    if (!el.isConnected) return;
+    fill.style.width = '100%';
+    num.textContent = `${label} · ${fmt(needExp(lv))} / ${fmt(needExp(lv))} EXP`;
+    await sleep(750);
+    if (!el.isConnected) return;
+    badge.textContent = `Lv.${lv + 1}`;
+    badge.classList.remove('up'); void badge.offsetWidth; badge.classList.add('up');
+    fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = '';
+  }
+  if (!el.isConnected) return;
+  fill.style.width = (to.exp / needExp(to.lv) * 100) + '%';
+  num.textContent = `${label} · ${fmt(to.exp)} / ${fmt(needExp(to.lv))} EXP`;
+}
+
+async function playAllExp({ all, game }) {
+  await Promise.all([playExp('lv-game', game.from, game.to), playExp('lv-all', all.from, all.to)]);
+  if (!stage.querySelector('#lv-game')) return;
+  // 둘 다 오르면 전체 레벨 업을 우선 보여줌
+  if (all.to.lv > all.from.lv) toast('레벨 업!', `전체 Lv.${all.to.lv} 달성`);
+  else if (game.to.lv > game.from.lv) toast('레벨 업!', `${GAME.title} Lv.${game.to.lv} 달성`);
+}
+
+function toast(big, small) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.setAttribute('role', 'status');
+  t.innerHTML = `${big}<small>${small}</small>`;
+  document.body.appendChild(t);
+  t.addEventListener('animationend', () => t.remove());
+}
+
+// ---------- 모드 ----------
+// max: 동시에 나와 있는 두더지 최대 수 / special: 10마리 중 황금 두더지 수 / traps: 한 판의 폭탄 수
+// regen: 스폰 쿨타임(최대 수보다 적으면 이 간격마다 1마리) / EXP = 득점 × expRate
+const LIMIT = 15;
+const STAY_MS = { normal: 2000, special: 1000, trap: 2000 }; // 디스폰: 나온 뒤 쏙 들어가기까지
+const BONK_MS = 200;    // 맞은 두더지가 들어가기까지 (이 동안은 눌러도 무시)
+const PTS = { normal: 10, special: 30, trap: -50 };
+const ESCAPE_PTS = -10; // 두더지(일반·황금)가 도망감
+const WHIFF_PTS = -1;   // 빈 구멍·엉뚱한 곳
+// 키보드는 숫자 패드 배열: 위 줄 789 / 가운데 456 / 아래 123
+const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+const MODES = {
+  easy:   { label: 'Easy',   best: GAME.bests.Easy,   max: 2, special: 2, traps: 3,  regen: 1200, expRate: 3 },
+  normal: { label: 'Normal', best: GAME.bests.Normal, max: 3, special: 3, traps: 7,  regen: 900,  expRate: 3 },
+  hard:   { label: 'Hard',   best: GAME.bests.Hard,   max: 4, special: 4, traps: 15, regen: 600,  expRate: 3 },
+};
+const blurb = m => `최대 ${m.max}마리 · 황금 ${m.special}/10 · 폭탄 ${m.traps}개`;
+let M = MODES.easy;
+const modeTag = document.getElementById('modeTag');
+
+// ---------- 화면 흐름 ----------
+let keyOff = null;
+
+function scene(html) {
+  if (keyOff) { keyOff(); keyOff = null; }
+  stage.innerHTML = `<div class="scene">${html}</div>`;
+  return stage.firstChild;
+}
+
+function onKeys(fn) {
+  const h = e => { if (!e.repeat) fn(e); };
+  window.addEventListener('keydown', h);
+  keyOff = () => window.removeEventListener('keydown', h);
+}
+
+const peekHTML = () => `<div class="peek" aria-hidden="true"><span class="mound"></span><span class="pit"></span><span class="clip"><span class="mole">${MOLE}</span></span></div>`;
+
+function intro() {
+  modeTag.textContent = '모드 선택';
+  scene(`
+    <h1 class="title">두더지 <em>잡기</em></h1>
+    <p class="sub">모드를 골라 주세요.</p>
+    ${peekHTML()}
+    <div class="modes">${Object.entries(MODES).map(([id, m], k) => {
+      const b = loadRecord(m.best);
+      return `<button class="mode-card ${id} ${k === 0 ? 'wide' : ''}" data-mode="${id}">
+        <b>${m.label}</b><span>${blurb(m)}</span>
+        <small>${b !== null ? `최고 ${b}점` : '&nbsp;'}</small></button>`;
+    }).join('')}</div>
+    <div class="spacer"></div>
+    ${lvBlock()}`);
+  stage.querySelectorAll('.mode-card').forEach(b => b.addEventListener('click', () => modeIntro(b.dataset.mode)));
+  stage.querySelector('.mode-card').focus();
+}
+
+function modeIntro(id) {
+  M = MODES[id];
+  modeTag.textContent = `${M.label} 모드`;
+  const best = loadRecord(M.best);
+  scene(`
+    <button class="back" id="back">← 모드 선택</button>
+    <h1 class="title"><em>${M.label}</em> 모드</h1>
+    <ul class="rules">
+      <li><b>15초</b> 동안 두더지를 최대한 잡아요</li>
+      <li>${(M.regen / 1000).toFixed(2)}초마다 1마리씩, 한 번에 <b>최대 ${M.max}마리</b> 나와요</li>
+      <li>두더지 <b>+10점</b> <small>(${STAY_MS.normal / 1000}초 뒤 쏙)</small></li>
+      <li>왕관 쓴 <b>황금 두더지 +30점</b> <small>(${STAY_MS.special / 1000}초 뒤 쏙 · 10마리 중 ${M.special}마리)</small></li>
+      <li>두더지를 놓치면 <span class="red">-10점</span></li>
+      <li><span class="red">폭탄</span>을 누르면 <span class="red">-50점</span> <small>(한 판에 ${M.traps}개)</small></li>
+      <li>빈 구멍이나 엉뚱한 곳을 누르면 <span class="red">-1점</span></li>
+      <li class="keys-only">키보드 숫자 패드로도 잡을 수 있어요 <small>(위 789 · 가운데 456 · 아래 123)</small></li>
+      <li>얻는 EXP = <span class="red">득점 × ${M.expRate}</span> <small>(0점 이하는 EXP·기록 없음)</small></li>
+    </ul>
+    <div class="spacer"></div>
+    ${lvBlock()}
+    <div class="btn-row" style="margin-top:18px"><button class="btn" id="go">시작하기</button></div>
+    <p class="best-line">${best !== null ? `최고 점수 ${best}점` : '아직 기록이 없어요'}</p>`);
+  stage.querySelector('#back').addEventListener('click', intro);
+  const go = stage.querySelector('#go');
+  go.addEventListener('click', start);
+  go.focus();
+}
+
+// ========== 플레이 ==========
+// slots[i]: null = 빈 구멍 / { type: 'normal' | 'special' | 'trap', bonk: 맞고 들어가는 중 }
+let slots, bag, score, stats, t0, over, run = 0;
+const timers = new Set();
+
+// 판이 바뀌거나 끝나면 예약해 둔 동작이 실행되지 않도록 run으로 구분
+function later(ms, fn) {
+  const tok = run;
+  const id = setTimeout(() => { timers.delete(id); if (tok === run && !over) fn(); }, ms);
+  timers.add(id);
+}
+function stopTimers() { timers.forEach(clearTimeout); timers.clear(); }
+
+function start() {
+  run++; stopTimers();
+  slots = Array(9).fill(null); bag = [];
+  score = 0; over = false;
+  stats = { normal: 0, special: 0, trap: 0, escaped: 0, whiff: 0 };
+  scene(`
+    <div class="hud">
+      <span class="clock" id="clock"><b id="time">15.00</b>초</span>
+      <span class="pts">점수 <b id="score">0</b></span>
+    </div>
+    <div class="tbar" id="tbar"><i id="tfill"></i></div>
+    <div class="field" id="field">
+      <div class="grid">${Array.from({ length: 9 }, (_, i) => `
+        <button class="hole" data-i="${i}" tabindex="-1" aria-label="${i + 1}번 구멍">
+          <span class="mound"></span><span class="pit"></span>
+          <span class="clip"><span class="mole"></span></span>
+          <kbd>${KEYS[i]}</kbd>
+        </button>`).join('')}
+      </div>
+    </div>
+    <p class="msg" id="msg">두더지를 잡아라!</p>`);
+  // 잔디밭 어디를 눌러도 판정 (나와 있는 게 없으면 헛방)
+  stage.querySelector('#field').addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const h = e.target.closest('.hole');
+    whack(h ? +h.dataset.i : -1);
+  });
+  onKeys(e => { const i = KEYS.indexOf(e.key); if (i >= 0) whack(i); });
+  t0 = performance.now();
+  requestAnimationFrame(tick);
+  show(nextType());
+  later(M.regen, regen);
+  scheduleTraps();
+}
+
+const holeEl = i => stage.querySelectorAll('.hole')[i];
+const say = text => { stage.querySelector('#msg').textContent = text; };
+// 함정과 맞고 들어가는 중인 두더지는 세지 않음
+const moleCount = () => slots.filter(s => s && s.type !== 'trap' && !s.bonk).length;
+
+// 테트리스 가방: 10마리마다 황금 두더지가 정확히 n마리, 순서만 섞음
+function nextType() {
+  if (!bag.length) {
+    bag = Array.from({ length: 10 }, (_, k) => k < M.special ? 'special' : 'normal');
+    for (let k = bag.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [bag[k], bag[j]] = [bag[j], bag[k]]; }
+  }
+  return bag.pop();
+}
+
+// 빈 구멍 하나에 등장 (빈 구멍이 없으면 false)
+function show(type) {
+  const free = slots.flatMap((s, i) => s ? [] : [i]);
+  if (!free.length) return false;
+  const i = free[Math.floor(Math.random() * free.length)];
+  const s = { type, bonk: false };
+  slots[i] = s;
+  const h = holeEl(i);
+  h.querySelector('.mole').innerHTML = type === 'trap' ? BOMB : MOLE;
+  h.className = `hole ${type}`;
+  void h.offsetWidth;
+  h.classList.add('up');
+  later(STAY_MS[type], () => { if (slots[i] === s && !s.bonk) leave(i); });
+  return true;
+}
+
+// 시간이 지나 쏙 들어감 (두더지면 도망 페널티, 폭탄은 그냥 사라짐)
+function leave(i) {
+  const s = slots[i];
+  const h = holeEl(i);
+  slots[i] = null;
+  h.classList.remove('up');
+  if (s.type === 'trap') return;
+  stats.escaped++;
+  score += ESCAPE_PTS;
+  bump();
+  popText(h, String(ESCAPE_PTS), 'minus');
+  say(`도망갔다! ${ESCAPE_PTS}`);
+  refill();
+}
+
+// 나와 있는 두더지가 하나도 없으면 쿨타임을 기다리지 않고 바로 1마리
+function refill() { if (moleCount() === 0) show(nextType()); }
+
+// 스폰 쿨타임마다 1마리 (최대 수면 건너뜀)
+function regen() {
+  if (moleCount() < M.max) show(nextType());
+  later(M.regen, regen);
+}
+
+// 폭탄은 두더지 스폰과 따로: 한 판에 정해진 개수를 무작위 시각에 (끝나기 전에 들어가도록)
+function scheduleTraps() {
+  for (let k = 0; k < M.traps; k++) later(500 + Math.random() * (LIMIT * 1000 - STAY_MS.trap - 700), trap);
+}
+function trap() { if (!show('trap')) later(150, trap); }
+
+function whack(i) {
+  if (over) return;
+  const s = i >= 0 ? slots[i] : null;
+  if (s && s.bonk) return;
+  if (!s) { whiff(i); return; }
+
+  const h = holeEl(i);
+  s.bonk = true;
+  stats[s.type]++;
+  score += PTS[s.type];
+  bump();
+  if (s.type === 'trap') {
+    h.classList.remove('up');
+    const b = document.createElement('span');
+    b.className = 'boom';
+    h.appendChild(b);
+    b.addEventListener('animationend', () => b.remove());
+    popText(h, '-50', 'minus');
+    say('펑! 폭탄이었다 -50');
+  } else if (s.type === 'special') {
+    h.classList.add('bonk');
+    popText(h, '+30', 'gold');
+    say('황금 두더지! +30');
+  } else {
+    h.classList.add('bonk');
+    popText(h, '+10', 'hit');
+    say(['퍽!', '잡았다!', '나이스!', '좋아요!'][stats.normal % 4]);
+  }
+  later(BONK_MS, () => { if (slots[i] === s) { slots[i] = null; h.classList.remove('up'); } });
+  refill();
+}
+
+// 헛방: -1점 (스턴 없음), 잔디밭이 살짝 흔들림
+function whiff(i) {
+  stats.whiff++;
+  score += WHIFF_PTS;
+  bump();
+  const field = stage.querySelector('#field');
+  popText(i >= 0 ? holeEl(i) : field, String(WHIFF_PTS), 'minus');
+  field.classList.remove('miss'); void field.offsetWidth; field.classList.add('miss');
+  say(`헛방! ${WHIFF_PTS}`);
+}
+
+function popText(h, text, cls) {
+  const p = document.createElement('span');
+  p.className = `pop ${cls}`;
+  p.textContent = text;
+  h.appendChild(p);
+  p.addEventListener('animationend', () => p.remove());
+}
+
+function bump() {
+  const el = stage.querySelector('#score');
+  el.textContent = score;
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+}
+
+function tick(now) {
+  const timeEl = stage.querySelector('#time');
+  if (!timeEl || over) return;
+  const left = Math.max(0, LIMIT - (now - t0) / 1000);
+  timeEl.textContent = left.toFixed(2);
+  stage.querySelector('#tfill').style.width = (left / LIMIT * 100) + '%';
+  stage.querySelector('#clock').classList.toggle('low', left < 5);
+  stage.querySelector('#tbar').classList.toggle('low', left < 5);
+  if (left <= 0) { end(); return; }
+  requestAnimationFrame(tick);
+}
+
+function end() {
+  over = true;
+  stopTimers();
+  stage.querySelector('#field').classList.add('over');
+  stage.querySelectorAll('.hole').forEach(h => h.classList.remove('up'));
+  stage.querySelector('#msg').innerHTML = '<span class="end">그만!</span>';
+  const tok = run;
+  setTimeout(() => { if (tok === run && stage.querySelector('#field')) finish(); }, 900);
+}
+
+// ---------- 결과 ----------
+function finish() {
+  const best = loadRecord(M.best);
+  const isBest = score > 0 && (best === null || score > best);
+  if (isBest) { try { localStorage.setItem(M.best, String(score)); } catch {} }
+
+  // 폭탄 때문에 득점이 0 이하일 수 있음 → EXP 없음
+  const gain = Math.max(0, score) * M.expRate;
+  const before = { game: loadLv(GAME.lvKey), all: loadLv() };
+  const change = giveExp(GAME.lvKey, gain);
+  scene(`
+    <div class="final">
+      <div class="lbl">${M.label} 모드 · 15초 득점</div>
+      <div class="score">${score}<small>점</small></div>
+      <div class="stats">
+        <span>두더지 <b>${stats.normal}</b></span><span>황금 <b>${stats.special}</b></span><span>폭탄 <b>${stats.trap}</b></span>
+        <span>놓침 <b>${stats.escaped}</b></span><span>헛방 <b>${stats.whiff}</b></span>
+      </div>
+      ${isBest ? '<span class="new-best">최고 기록!</span>' : best !== null ? `<p class="best-line" style="margin-top:8px">최고 점수 ${best}점</p>` : ''}
+    </div>
+    <div class="exp-gain"><mark>+${fmt(gain)} EXP</mark></div>
+    <p class="exp-calc">${score > 0 ? `득점 ${score} × ${M.expRate}` : '득점이 0점 이하라 EXP가 없어요'}</p>
+    ${lvHTML(before.game, 'lv-game', GAME.title)}${lvHTML(before.all, 'lv-all', '전체', true)}
+    <div class="spacer"></div>
+    <div class="btn-row">
+      <button class="btn" id="again">한 번 더</button>
+      <button class="btn ghost" id="modes">모드 선택</button>
+    </div>`);
+  const again = stage.querySelector('#again');
+  const modes = stage.querySelector('#modes');
+  again.addEventListener('click', start);
+  modes.addEventListener('click', intro);
+  // 연타하던 손가락·키로 바로 재시작되지 않도록 잠깐 막음
+  again.disabled = modes.disabled = true;
+  setTimeout(() => { again.disabled = modes.disabled = false; again.focus(); }, 700);
+  playAllExp(change);
+}
+
+
+intro();
+</script>
+</body>
+</html>
